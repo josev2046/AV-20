@@ -25,7 +25,7 @@
             align-items: stretch;
             border-radius: 10px;
             box-shadow: 0 25px 60px rgba(0,0,0,0.95), 0 0 40px rgba(0,0,0,0.8);
-            width: 1180px; /* Reduced Locked Width */
+            width: 1180px; 
             min-width: 1180px;
             margin: 0 auto;
         }
@@ -185,18 +185,20 @@
 
         /* Pitch Wheel */
         .pitch-wheel-wrapper {
-            width: 48px; height: 130px; background: #080808; border-radius: 6px; border: 2px solid #2a2722; box-shadow: inset 0 4px 10px rgba(0,0,0,0.9);
+            width: 48px; height: 110px; background: #080808; border-radius: 6px; border: 2px solid #2a2722; box-shadow: inset 0 4px 10px rgba(0,0,0,0.9);
             display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden;
             flex-shrink: 0;
         }
         .pitch-wheel-wrapper::after { content: ''; position: absolute; width: 20px; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); pointer-events: none; }
-        .pitch-wheel { -webkit-appearance: none; transform: rotate(270deg); width: 110px; height: 28px; background: transparent; cursor: ns-resize; }
+        .pitch-wheel { -webkit-appearance: none; transform: rotate(270deg); width: 90px; height: 28px; background: transparent; cursor: ns-resize; }
         .pitch-wheel::-webkit-slider-thumb { 
             -webkit-appearance: none; height: 28px; width: 44px; border-radius: 4px; background: #171614; 
             border: 2px solid #000; box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.9); 
             background-image: repeating-linear-gradient(90deg, transparent, transparent 4px, rgba(255,255,255,0.15) 4px, rgba(255,255,255,0.15) 6px); 
         }
         .pitch-wheel::-webkit-slider-runnable-track { width: 100%; height: 28px; background: transparent; }
+        
+        .kbd-hint { font-size: 8px; color: #82796e; position: absolute; bottom: 4px; width: 100%; text-align: center; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -407,7 +409,8 @@
 
             <!-- KEYBOARD SECTION -->
             <div class="w-full flex gap-6 items-end">
-                <div class="flex flex-col items-center gap-2 mb-1">
+                <div class="flex flex-col items-center gap-2 mb-1 flex-shrink-0">
+                    <button id="btn-latch" class="tactile-button text-[9px] font-bold w-full py-1.5 rounded-sm mb-1" title="Hold notes indefinitely">LATCH</button>
                     <div class="pitch-wheel-wrapper">
                         <input type="range" id="ctrl-pitch-wheel" min="-7" max="7" value="0" class="pitch-wheel">
                     </div>
@@ -421,7 +424,10 @@
             </div>
 
             <!-- FOOTER -->
-            <div class="flex justify-end w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
+            <div class="flex justify-between items-center w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
+                <div class="text-[9px] text-[#82796e] font-mono tracking-widest">
+                    QWERTY: Z-M (LOWER) / Q-I (UPPER)
+                </div>
                 <div class="text-[10px] text-[#38342e] font-mono font-bold tracking-widest">
                     &copy; JOSE VELAZQUEZ MA / <a href="https://voltageandwave.co.uk/" target="_blank" rel="noopener noreferrer" class="hover:text-[#c83a2a] underline transition-colors">VOLTAGE &amp; WAVE</a>
                 </div>
@@ -445,6 +451,7 @@
                 // Hardware specs: 32 keys, F2 to C5
                 this.baseMidiNote = 41; 
                 this.numKeys = 32;
+                this.latchMode = false;
 
                 this.micGain = null;
                 this.noiseGen = null;
@@ -471,6 +478,14 @@
                     80, 110, 150, 200, 270, 360, 480, 640, 850, 1100, 
                     1450, 1900, 2500, 3300, 4300, 5600, 7300, 9500, 12000, 15000
                 ];
+
+                // QWERTY Mapping (F2 to C5 across two rows)
+                this.qwertyMap = {
+                    'z': 41, 's': 42, 'x': 43, 'd': 44, 'c': 45, 'f': 46, 'v': 47,
+                    'b': 48, 'h': 49, 'n': 50, 'j': 51, 'm': 52, 
+                    ',': 53, 'l': 54, '.': 55, ';': 56, '/': 57,
+                    'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67, '6': 68, 'y': 69, '7': 70, 'u': 71, 'i': 72
+                };
 
                 this.setupKeyboardUI();
                 this.bindControls();
@@ -681,7 +696,14 @@
             }
 
             noteOn(midiNote) {
-                if (!this.isActive || this.activeVoices.has(midiNote)) return;
+                if (!this.isActive) return;
+
+                if (this.latchMode && this.activeVoices.has(midiNote)) {
+                    this.noteOff(midiNote, true); // Toggle off if already latched
+                    return;
+                }
+
+                if (this.activeVoices.has(midiNote)) return;
 
                 const isOctaveUp = document.getElementById('btn-octave').innerText.includes("8'");
                 const actualMidi = isOctaveUp ? midiNote + 12 : midiNote;
@@ -729,14 +751,24 @@
                 
                 oscMain.start(); oscPulse.start(); oscSub.start();
                 this.activeVoices.set(midiNote, { oscMain, oscPulse, oscSub, voiceGain });
+
+                // UI Update
+                const keyEl = document.querySelector(`[data-note="${midiNote}"]`);
+                if (keyEl) keyEl.classList.add('active-key');
             }
 
-            noteOff(midiNote) {
+            noteOff(midiNote, force = false) {
                 if (!this.activeVoices.has(midiNote)) return;
+                if (this.latchMode && !force) return;
+
                 const voice = this.activeVoices.get(midiNote);
                 voice.oscMain.stop(); voice.oscPulse.stop(); voice.oscSub.stop();
                 voice.voiceGain.disconnect();
                 this.activeVoices.delete(midiNote);
+
+                // UI Update
+                const keyEl = document.querySelector(`[data-note="${midiNote}"]`);
+                if (keyEl) keyEl.classList.remove('active-key');
             }
 
             setupKeyboardUI() {
@@ -749,24 +781,35 @@
                 // Pattern: W, B, W, B, W, W, B, W, B, W, B, W (starts on F)
                 const isBlackPattern = [false, true, false, true, false, false, true, false, true, false, true, false];
                 
+                // For UI Hints
+                const revQwertyMap = {};
+                for (const [char, note] of Object.entries(this.qwertyMap)) {
+                    revQwertyMap[note] = char.toUpperCase();
+                }
+                
                 for (let i = 0; i < this.numKeys; i++) {
                     const midiNote = this.baseMidiNote + i;
                     const isBlack = isBlackPattern[i % 12];
                     
                     const btn = document.createElement('div');
+                    btn.dataset.note = midiNote;
+                    
+                    const hintChar = revQwertyMap[midiNote] || '';
                     
                     if (isBlack) {
                         btn.className = `key-black`;
                         // Position exactly on the border of the preceding white key
                         const leftPercent = ((whiteIndex) / totalWhiteKeys) * 100;
                         btn.style.left = `${leftPercent}%`;
+                        if (hintChar) btn.innerHTML = `<span class="kbd-hint" style="color: #666; bottom: 8px;">${hintChar}</span>`;
                     } else {
                         btn.className = `key-white`;
+                        if (hintChar) btn.innerHTML = `<span class="kbd-hint">${hintChar}</span>`;
                         whiteIndex++;
                     }
                     
-                    const triggerOn = (e) => { e.preventDefault(); this.noteOn(midiNote); btn.classList.add('active-key'); };
-                    const triggerOff = (e) => { e.preventDefault(); this.noteOff(midiNote); btn.classList.remove('active-key'); };
+                    const triggerOn = (e) => { e.preventDefault(); this.noteOn(midiNote); };
+                    const triggerOff = (e) => { e.preventDefault(); this.noteOff(midiNote); };
                     
                     btn.addEventListener('pointerdown', triggerOn);
                     btn.addEventListener('pointerup', triggerOff);
@@ -802,6 +845,18 @@
             bindControls() {
                 document.getElementById('btn-power').addEventListener('click', () => this.init());
 
+                const latchBtn = document.getElementById('btn-latch');
+                latchBtn.addEventListener('click', () => {
+                    this.latchMode = !this.latchMode;
+                    if (this.latchMode) latchBtn.classList.add('active-toggle');
+                    else {
+                        latchBtn.classList.remove('active-toggle');
+                        // Clear all active notes
+                        const playingNotes = Array.from(this.activeVoices.keys());
+                        playingNotes.forEach(note => this.noteOff(note, true));
+                    }
+                });
+
                 const octBtn = document.getElementById('btn-octave');
                 octBtn.addEventListener('click', () => {
                     if (octBtn.innerText.includes("16'")) {
@@ -823,6 +878,18 @@
                 });
 
                 document.getElementById('ctrl-pitch-wheel').addEventListener('input', () => this.updateActivePitches());
+
+                // QWERTY Keyboard Listeners
+                document.addEventListener('keydown', (e) => {
+                    if (e.repeat || e.metaKey || e.ctrlKey) return;
+                    const note = this.qwertyMap[e.key.toLowerCase()];
+                    if (note) this.noteOn(note);
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    const note = this.qwertyMap[e.key.toLowerCase()];
+                    if (note) this.noteOff(note);
+                });
 
                 let activeKnob = null, startY = 0, startVal = 0;
 
@@ -1103,4 +1170,4 @@
         window.addEventListener('DOMContentLoaded', () => { window.synthInstance = new VWVocoder(); });
     </script>
 </body>
-</html>
+</html>qqwzz
