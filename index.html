@@ -1,1173 +1,551 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voltage & Wave — AV-20 Analogue Vocoder Emulator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
-
-        body { 
-            background-color: #0d0f12; 
-            color: #1a1e24; 
-            font-family: monospace; 
-            text-transform: uppercase; 
-            padding: 2rem; 
-            user-select: none; 
-            -webkit-tap-highlight-color: transparent;
-            min-height: 100vh;
-        }
-        
-        .synth-enclosure {
-            position: relative;
-            display: flex;
-            align-items: stretch;
-            border-radius: 10px;
-            box-shadow: 0 25px 60px rgba(0,0,0,0.95), 0 0 40px rgba(0,0,0,0.8);
-            width: 1180px; 
-            min-width: 1180px;
-            margin: 0 auto;
-        }
-
-        .wooden-ear {
-            width: 32px;
-            background: linear-gradient(90deg, #2b150c 0%, #522815 30%, #3a1b0d 70%, #1c0b05 100%);
-            border-top: 2px solid #733c1d;
-            border-bottom: 3px solid #0f0502;
-            box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -2px 6px rgba(0,0,0,0.9);
-            flex-shrink: 0;
-        }
-        .wooden-ear-left { border-top-left-radius: 10px; border-bottom-left-radius: 10px; border-right: 2px solid #111; }
-        .wooden-ear-right { border-top-right-radius: 10px; border-bottom-right-radius: 10px; border-left: 2px solid #111; }
-
-        .chassis { 
-            background: radial-gradient(circle at 50% 20%, #f0ebd8 0%, #e2dbc8 60%, #cebba8 100%); 
-            border-top: 3px solid #f7f4e9; 
-            border-bottom: 4px solid #82796e; 
-            padding: 32px 36px; 
-            flex-grow: 1;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.8), inset 0 -2px 5px rgba(0,0,0,0.3);
-        }
-
-        .rack-bolt {
-            width: 12px; height: 12px; border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #a39c8e 0%, #3a362f 80%);
-            border: 1px solid #1a1815;
-            box-shadow: inset 0 1px 1px rgba(255,255,255,0.6), 0 2px 4px rgba(0,0,0,0.3);
-            position: absolute;
-        }
-        .bolt-tl { top: 12px; left: 12px; }
-        .bolt-tr { top: 12px; right: 12px; }
-        .bolt-bl { bottom: 12px; left: 12px; }
-        .bolt-br { bottom: 12px; right: 12px; }
-
-        .logo-panel { background: linear-gradient(180deg, #2a2722 0%, #171614 100%); border: 1.5px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.4); }
-        .logo-panel-accent { background: linear-gradient(180deg, #8a2217 0%, #4a0d07 100%); border: 1.5px solid #000; box-shadow: inset 0 1px 1px rgba(255,255,255,0.3), 0 0 10px rgba(200, 58, 42, 0.4); }
-        .logo-panel-accent .logo-char { color: #ff9d93; }
-        .logo-panel .logo-char { color: #f0ebd8; }
-
-        .panel-outline {
-            border: 1.5px solid #38342e; border-radius: 6px; background: rgba(0, 0, 0, 0.025);
-            box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.7);
-            width: 100%; box-sizing: border-box;
-        }
-
-        .panel-divider {
-            width: 1.5px; height: 70px; flex-shrink: 0;
-            background: linear-gradient(180deg, transparent 0%, rgba(56, 52, 46, 0.15) 15%, rgba(56, 52, 46, 0.15) 85%, transparent 100%);
-            border-right: 1px solid rgba(255,255,255,0.3);
-        }
-
-        /* Hardware Components */
-        .tactile-button {
-            background: linear-gradient(180deg, #33363d 0%, #191a1e 100%);
-            border: 2px solid #000; color: #f0ebd8;
-            box-shadow: 0 2px 0 #000, 0 3px 5px rgba(0,0,0,0.3);
-            transition: all 0.08s ease; cursor: pointer;
-        }
-        .tactile-button:active { transform: translateY(1px); box-shadow: 0 1px 0 #000, 0 1px 2px rgba(0,0,0,0.3); }
-        .tactile-button.active-toggle { 
-            background: linear-gradient(180deg, #c83a2a 0%, #801f13 100%); 
-            border-color: #ff8878; color: #fff; 
-            box-shadow: 0 2px 0 #000, 0 0 12px rgba(200, 58, 42, 0.8); 
-        }
-
-        .rocker-button {
-            background: linear-gradient(180deg, #991b1b 0%, #5c0f0f 100%);
-            border: 2px solid #280505;
-            box-shadow: 0 3px 0 #1a0303, 0 4px 6px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.3);
-            transition: all 0.08s ease; cursor: pointer;
-        }
-        .rocker-button:active { transform: translateY(2px); box-shadow: 0 1px 0 #1a0303; }
-        .rocker-button.is-active {
-            background: linear-gradient(180deg, #16a34a 0%, #14532d 100%);
-            border-color: #86efac;
-            box-shadow: 0 3px 0 #052e16, 0 0 16px rgba(34, 197, 94, 0.7);
-        }
-
-        .preset-btn { font-family: 'JetBrains Mono', monospace; padding: 4px 8px; font-weight: 700; transition: all 0.2s; white-space: nowrap; width: 100%; }
-        .preset-btn:not(.active-toggle):hover { background: #444; }
-
-        /* Custom Rotary Knobs */
-        .knob-wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; width: 64px; }
-        .tick-container { position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
-        
-        .tick-ring {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%;
-            -webkit-mask: radial-gradient(circle, transparent 25px, #000 26px, #000 32px, transparent 32px);
-            mask: radial-gradient(circle, transparent 25px, #000 26px, #000 32px, transparent 32px);
-            background: conic-gradient(from -135deg,
-                #221e1a 0deg 1.5deg, transparent 1.5deg 27deg, #221e1a 27deg 28.5deg, transparent 28.5deg 54deg,
-                #221e1a 54deg 55.5deg, transparent 55.5deg 81deg, #221e1a 81deg 82.5deg, transparent 82.5deg 108deg,
-                #221e1a 108deg 109.5deg, transparent 109.5deg 135deg, #221e1a 135deg 136.5deg, transparent 136.5deg 162deg,
-                #221e1a 162deg 163.5deg, transparent 163.5deg 189deg, #221e1a 189deg 190.5deg, transparent 190.5deg 216deg,
-                #221e1a 216deg 217.5deg, transparent 217.5deg 243deg, #221e1a 243deg 244.5deg, transparent 244.5deg 270deg,
-                #221e1a 270deg 271.5deg, transparent 271.5deg 360deg
-            );
-        }
-
-        .tick-label { position: absolute; font-size: 8px; font-weight: bold; color: #221e1a; line-height: 1; pointer-events: none; }
-        .label-top { top: -2px; left: 50%; transform: translateX(-50%); }
-        .label-left { bottom: 2px; left: 2px; }
-        .label-right { bottom: 2px; right: 2px; }
-
-        .knob { 
-            width: 48px; height: 46px; border-radius: 50%; 
-            background: radial-gradient(circle at 35% 35%, #2d3036 0%, #15171a 70%, #050608 100%); 
-            border: 2px solid #000; cursor: ns-resize; position: relative; z-index: 2;
-            box-shadow: inset 0 1px 2px rgba(255,255,255,0.3), 0 4px 7px rgba(0,0,0,0.35);
-            transform: rotate(-135deg); touch-action: none;
-        }
-        .knob::after { content: ''; position: absolute; top: 4px; left: 21px; width: 2px; height: 14px; background: #fff; border-radius: 1px; box-shadow: 0 0 2px rgba(255,255,255,0.9); }
-
-        /* CRT Analyzer */
-        .crt-screen { 
-            background: #041004; border: 4px solid #2a2722; border-radius: 8px;
-            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.25), inset 0 0 12px #000, 0 3px 6px rgba(0,0,0,0.4); 
-            position: relative; overflow: hidden; box-sizing: border-box;
-        }
-        .crt-screen::before {
-            content: " "; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            z-index: 5; background-size: 100% 3px, 6px 100%; pointer-events: none;
-        }
-
-        /* Exact 32-Key F-to-C CSS Layout */
-        .keyboard-bed {
-            display: flex; position: relative; width: 100%; height: 150px;
-            background: #1a1815; padding: 4px; border-radius: 6px; border: 2px solid #111;
-            box-shadow: inset 0 10px 20px rgba(0,0,0,0.8);
-        }
-        .key-white {
-            flex: 1; /* 19 white keys distribute perfectly */
-            background: linear-gradient(180deg, #ffffff 0%, #d8d3c5 100%);
-            border: 1px solid #000; border-radius: 0 0 5px 5px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 -4px 6px rgba(0,0,0,0.1);
-            position: relative; z-index: 1; cursor: pointer; transition: background 0.05s;
-            touch-action: none;
-        }
-        .key-white.active-key { background: #c83a2a; box-shadow: inset 0 4px 8px rgba(0,0,0,0.5); transform: translateY(1px); }
-        
-        .key-black {
-            position: absolute; width: 3.2%; height: 62%;
-            background: linear-gradient(180deg, #222 0%, #050505 100%);
-            border: 2px solid #000; border-radius: 0 0 4px 4px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 -4px 4px rgba(255,255,255,0.1);
-            z-index: 10; cursor: pointer; transform: translateX(-50%);
-            touch-action: none;
-        }
-        .key-black.active-key { background: #c83a2a; box-shadow: inset 0 4px 8px rgba(0,0,0,0.8); transform: translateX(-50%) translateY(1px); }
-
-        /* Pitch Wheel */
-        .pitch-wheel-wrapper {
-            width: 48px; height: 110px; background: #080808; border-radius: 6px; border: 2px solid #2a2722; box-shadow: inset 0 4px 10px rgba(0,0,0,0.9);
-            display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden;
-            flex-shrink: 0;
-        }
-        .pitch-wheel-wrapper::after { content: ''; position: absolute; width: 20px; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); pointer-events: none; }
-        .pitch-wheel { -webkit-appearance: none; transform: rotate(270deg); width: 90px; height: 28px; background: transparent; cursor: ns-resize; }
-        .pitch-wheel::-webkit-slider-thumb { 
-            -webkit-appearance: none; height: 28px; width: 44px; border-radius: 4px; background: #171614; 
-            border: 2px solid #000; box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.9); 
-            background-image: repeating-linear-gradient(90deg, transparent, transparent 4px, rgba(255,255,255,0.15) 4px, rgba(255,255,255,0.15) 6px); 
-        }
-        .pitch-wheel::-webkit-slider-runnable-track { width: 100%; height: 28px; background: transparent; }
-        
-        .kbd-hint { font-size: 8px; color: #82796e; position: absolute; bottom: 4px; width: 100%; text-align: center; pointer-events: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voltage & Wave — AV-20 Analogue Vocoder Emulator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+body{background:#0d0f12;color:#1a1e24;font-family:monospace;text-transform:uppercase;padding:2rem;user-select:none;-webkit-tap-highlight-color:transparent;min-height:100vh}
+.synth-enclosure{position:relative;display:flex;align-items:stretch;border-radius:10px;box-shadow:0 25px 60px rgba(0,0,0,.95),0 0 40px rgba(0,0,0,.8);width:1280px;min-width:1280px;margin:0 auto}
+.wooden-ear{width:32px;background:linear-gradient(90deg,#2b150c 0%,#522815 30%,#3a1b0d 70%,#1c0b05 100%);border-top:2px solid #733c1d;border-bottom:3px solid #0f0502;box-shadow:inset 0 2px 4px rgba(255,255,255,.15),inset 0 -2px 6px rgba(0,0,0,.9);flex-shrink:0}
+.wooden-ear-left{border-radius:10px 0 0 10px;border-right:2px solid #111}
+.wooden-ear-right{border-radius:0 10px 10px 0;border-left:2px solid #111}
+.chassis{background:radial-gradient(circle at 50% 20%,#f0ebd8 0%,#e2dbc8 60%,#cebba8 100%);border-top:3px solid #f7f4e9;border-bottom:4px solid #82796e;padding:32px 36px;flex-grow:1;position:relative;display:flex;flex-direction:column;align-items:center;box-shadow:inset 0 1px 3px rgba(255,255,255,.8),inset 0 -2px 5px rgba(0,0,0,.3)}
+.rack-bolt{width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#a39c8e 0%,#3a362f 80%);border:1px solid #1a1815;box-shadow:inset 0 1px 1px rgba(255,255,255,.6),0 2px 4px rgba(0,0,0,.3);position:absolute}
+.bolt-tl{top:12px;left:12px}.bolt-tr{top:12px;right:12px}.bolt-bl{bottom:12px;left:12px}.bolt-br{bottom:12px;right:12px}
+.logo-panel{background:linear-gradient(180deg,#2a2722,#171614);border:1.5px solid #000;box-shadow:inset 0 1px 1px rgba(255,255,255,.2),0 2px 4px rgba(0,0,0,.4)}
+.logo-panel-accent{background:linear-gradient(180deg,#8a2217,#4a0d07);border:1.5px solid #000;box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 0 10px rgba(200,58,42,.4)}
+.logo-panel-accent .logo-char{color:#ff9d93}.logo-panel .logo-char{color:#f0ebd8}
+.panel-outline{border:1.5px solid #38342e;border-radius:6px;background:rgba(0,0,0,.025);box-shadow:inset 0 1px 2px rgba(0,0,0,.05),0 1px 0 rgba(255,255,255,.7);width:100%;box-sizing:border-box}
+.panel-divider{width:1.5px;height:70px;flex-shrink:0;background:linear-gradient(180deg,transparent,rgba(56,52,46,.15) 15%,rgba(56,52,46,.15) 85%,transparent);border-right:1px solid rgba(255,255,255,.3)}
+.tactile-button{background:linear-gradient(180deg,#33363d,#191a1e);border:2px solid #000;color:#f0ebd8;box-shadow:0 2px 0 #000,0 3px 5px rgba(0,0,0,.3);transition:all .08s ease;cursor:pointer}
+.tactile-button:active{transform:translateY(1px);box-shadow:0 1px 0 #000}
+.tactile-button.active-toggle{background:linear-gradient(180deg,#c83a2a,#801f13);border-color:#ff8878;color:#fff;box-shadow:0 2px 0 #000,0 0 12px rgba(200,58,42,.8)}
+.rocker-button{background:linear-gradient(180deg,#991b1b,#5c0f0f);border:2px solid #280505;box-shadow:0 3px 0 #1a0303,0 4px 6px rgba(0,0,0,.3),inset 0 1px 1px rgba(255,255,255,.3);transition:all .08s ease;cursor:pointer}
+.rocker-button:active{transform:translateY(2px);box-shadow:0 1px 0 #1a0303}
+.rocker-button.is-active{background:linear-gradient(180deg,#16a34a,#14532d);border-color:#86efac;box-shadow:0 3px 0 #052e16,0 0 16px rgba(34,197,94,.7)}
+.preset-btn{font-family:'JetBrains Mono',monospace;padding:4px 8px;font-weight:700;transition:all .2s;white-space:nowrap;width:100%}
+.preset-btn:not(.active-toggle):hover{background:#444}
+.knob-wrapper{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;width:64px}
+.tick-container{position:relative;width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.tick-ring{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(circle,transparent 25px,#000 26px,#000 32px,transparent 32px);mask:radial-gradient(circle,transparent 25px,#000 26px,#000 32px,transparent 32px);background:conic-gradient(from -135deg,#221e1a 0deg 1.5deg,transparent 1.5deg 27deg,#221e1a 27deg 28.5deg,transparent 28.5deg 54deg,#221e1a 54deg 55.5deg,transparent 55.5deg 81deg,#221e1a 81deg 82.5deg,transparent 82.5deg 108deg,#221e1a 108deg 109.5deg,transparent 109.5deg 135deg,#221e1a 135deg 136.5deg,transparent 136.5deg 162deg,#221e1a 162deg 163.5deg,transparent 163.5deg 189deg,#221e1a 189deg 190.5deg,transparent 190.5deg 216deg,#221e1a 216deg 217.5deg,transparent 217.5deg 243deg,#221e1a 243deg 244.5deg,transparent 244.5deg 270deg,#221e1a 270deg 271.5deg,transparent 271.5deg 360deg)}
+.tick-label{position:absolute;font-size:8px;font-weight:bold;color:#221e1a;line-height:1;pointer-events:none}
+.label-top{top:-2px;left:50%;transform:translateX(-50%)}.label-left{bottom:2px;left:2px}.label-right{bottom:2px;right:2px}
+.knob{width:48px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#2d3036 0%,#15171a 70%,#050608 100%);border:2px solid #000;cursor:ns-resize;position:relative;z-index:2;box-shadow:inset 0 1px 2px rgba(255,255,255,.3),0 4px 7px rgba(0,0,0,.35);transform:rotate(-135deg);touch-action:none}
+.knob::after{content:'';position:absolute;top:4px;left:21px;width:2px;height:14px;background:#fff;border-radius:1px;box-shadow:0 0 2px rgba(255,255,255,.9)}
+.crt-screen{background:#041004;border:4px solid #2a2722;border-radius:8px;box-shadow:inset 0 0 20px rgba(0,255,0,.25),inset 0 0 12px #000,0 3px 6px rgba(0,0,0,.4);position:relative;overflow:hidden;box-sizing:border-box}
+.crt-screen::before{content:" ";position:absolute;inset:0;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,.25) 50%),linear-gradient(90deg,rgba(255,0,0,.03),rgba(0,255,0,.01),rgba(0,0,255,.03));z-index:5;background-size:100% 3px,6px 100%;pointer-events:none}
+.keyboard-bed{display:flex;position:relative;width:100%;height:150px;background:#1a1815;padding:4px;border-radius:6px;border:2px solid #111;box-shadow:inset 0 10px 20px rgba(0,0,0,.8)}
+.key-white{flex:1;background:linear-gradient(180deg,#fff,#d8d3c5);border:1px solid #000;border-radius:0 0 5px 5px;box-shadow:0 4px 6px rgba(0,0,0,.2),inset 0 -4px 6px rgba(0,0,0,.1);position:relative;z-index:1;cursor:pointer;transition:background .05s;touch-action:none}
+.key-white.active-key{background:#c83a2a;box-shadow:inset 0 4px 8px rgba(0,0,0,.5);transform:translateY(1px)}
+.key-black{position:absolute;width:3.2%;height:62%;background:linear-gradient(180deg,#222,#050505);border:2px solid #000;border-radius:0 0 4px 4px;box-shadow:0 4px 6px rgba(0,0,0,.6),inset 0 -4px 4px rgba(255,255,255,.1);z-index:10;cursor:pointer;transform:translateX(-50%);touch-action:none}
+.key-black.active-key{background:#c83a2a;box-shadow:inset 0 4px 8px rgba(0,0,0,.8);transform:translateX(-50%) translateY(1px)}
+.pitch-wheel-wrapper{width:48px;height:110px;background:#080808;border-radius:6px;border:2px solid #2a2722;box-shadow:inset 0 4px 10px rgba(0,0,0,.9);display:flex;justify-content:center;align-items:center;position:relative;overflow:hidden;flex-shrink:0}
+.pitch-wheel{-webkit-appearance:none;transform:rotate(270deg);width:90px;height:28px;background:transparent;cursor:ns-resize}
+.pitch-wheel::-webkit-slider-thumb{-webkit-appearance:none;height:28px;width:44px;border-radius:4px;background:#171614;border:2px solid #000;box-shadow:inset 0 0 10px rgba(0,0,0,.8),0 0 8px rgba(0,0,0,.9);background-image:repeating-linear-gradient(90deg,transparent,transparent 4px,rgba(255,255,255,.15) 4px,rgba(255,255,255,.15) 6px)}
+.pitch-wheel::-webkit-slider-runnable-track{width:100%;height:28px;background:transparent}
+.kbd-hint{font-size:8px;color:#82796e;position:absolute;bottom:4px;width:100%;text-align:center;pointer-events:none}
+</style>
 </head>
 <body>
-    <div class="synth-enclosure">
-        <div class="wooden-ear wooden-ear-left"></div>
-
-        <div class="chassis">
-            <div class="rack-bolt bolt-tl"></div>
-            <div class="rack-bolt bolt-tr"></div>
-            <div class="rack-bolt bolt-bl"></div>
-            <div class="rack-bolt bolt-br"></div>
-            
-            <!-- HEADER -->
-            <div class="flex items-center justify-between w-full mb-8 pb-5 border-b-2 border-[#38342e]/40">
-                <!-- Logos -->
-                <div class="flex flex-col gap-2 flex-shrink-0">
-                    <div class="flex items-center gap-1.5 select-none justify-start">
-                        <div class="logo-panel-accent w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">V</span>
-                        </div>
-                        <div class="logo-panel-accent w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">&amp;</span>
-                        </div>
-                        <div class="logo-panel-accent w-11 h-11 rounded flex flex-col items-center justify-center relative mr-3">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">W</span>
-                        </div>
-                        
-                        <div class="logo-panel w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">A</span>
-                        </div>
-                        <div class="logo-panel w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">V</span>
-                        </div>
-                        <div class="logo-panel w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">-</span>
-                        </div>
-                        <div class="logo-panel w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">2</span>
-                        </div>
-                        <div class="logo-panel w-11 h-11 rounded flex flex-col items-center justify-center relative">
-                            <span class="logo-char font-mono font-black text-xl tracking-tighter leading-none">0</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between w-full text-[9px] font-mono font-bold tracking-widest text-[#38342e] border-t border-[#38342e]/30 pt-1.5 mt-1">
-                        <span>20-BAND VOCODER</span>
-                        <span class="text-[#c83a2a]">•</span>
-                        <span>ANALOG EMULATOR</span>
-                    </div>
-                </div>
-                
-                <!-- CRT ANALYZER -->
-                <div class="crt-screen w-[260px] h-[72px] flex items-center justify-between px-3 py-2 flex-shrink-0 mx-6">
-                    <canvas id="analyzer-canvas" width="170" height="50" class="z-10 h-full"></canvas>
-                    <div class="text-[#0f0] font-mono text-[9px] text-right leading-tight z-10 flex flex-col justify-center h-full pl-2 border-l border-[#0f0]/30 ml-2 gap-1.5 flex-1">
-                        <div id="status-mic" class="opacity-40 whitespace-nowrap">MIC: OFF</div>
-                        <div id="status-ptch" class="text-[#ffaa00] whitespace-nowrap">PTCH:<br>CLASSIC</div>
-                    </div>
-                </div>
-
-                <!-- PRESETS, DAW & POWER -->
-                <div class="flex items-end justify-between gap-6 flex-shrink-0">
-                    
-                    <!-- DAW RECORDER -->
-                    <div class="flex flex-col gap-2 items-center flex-shrink-0">
-                        <span class="text-[9px] font-bold tracking-widest text-[#82796e] uppercase">DAW Recorder</span>
-                        <div class="flex gap-2 items-center">
-                            <button id="btnRecord" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold whitespace-nowrap">● REC</button>
-                            <div id="recStatus" class="font-mono font-bold text-[#1f1a14] bg-[#e2dbc8] text-[10px] w-12 text-center py-1.5 rounded border border-[#38342e]/30">00:00</div>
-                            <a id="btnDownload" href="#" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold text-center opacity-40 pointer-events-none whitespace-nowrap">SAVE</a>
-                        </div>
-                    </div>
-
-                    <!-- PATCH MEMORY (2x2 Grid) -->
-                    <div class="flex flex-col gap-2 items-center flex-shrink-0">
-                        <span class="text-[9px] font-bold tracking-widest text-[#82796e] uppercase">Patch Memory</span>
-                        <div class="grid grid-cols-2 gap-1.5 w-[140px]">
-                            <button class="tactile-button active-toggle text-[9px] py-1 rounded-sm preset-btn" data-preset="classic">CLASSIC</button>
-                            <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="robot">ROBOT</button>
-                            <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="choir">CHOIR</button>
-                            <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="whisper">WHISPER</button>
-                        </div>
-                    </div>
-
-                    <!-- POWER -->
-                    <div class="flex flex-col items-center gap-2 flex-shrink-0">
-                        <span class="text-[9px] font-bold tracking-widest text-[#82796e] uppercase">Mic Pwr</span>
-                        <button id="btn-power" class="rocker-button text-white w-12 h-10 font-black rounded-sm flex items-center justify-center">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>
-                        </button>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- CONTROLS ROW -->
-            <div class="panel-outline w-full px-8 py-8 mb-8 flex justify-between items-center overflow-x-auto">
-                <div class="flex flex-nowrap items-center justify-between min-w-max gap-8 mx-auto w-full">
-                    
-                    <!-- OSCILLATOR -->
-                    <div class="flex items-center gap-6 relative">
-                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#ece6d5] px-2">OSCILLATOR</span>
-                        
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">-100</span>
-                                <span class="tick-label label-top">0</span>
-                                <span class="tick-label label-right">+100</span>
-                                <div class="knob global-knob" id="knob-tune" data-val="50"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">TUNE</span>
-                        </div>
-
-                        <div class="flex flex-col items-center justify-center h-full mt-2">
-                            <button id="btn-octave" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm active-toggle whitespace-nowrap">16' NRM</button>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-2">OCTAVE</span>
-                        </div>
-                    </div>
-
-                    <div class="panel-divider"></div>
-
-                    <!-- SIGNAL MIXER -->
-                    <div class="flex items-center gap-6 relative">
-                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e9e1cd] px-2">SIGNAL MIXER</span>
-                        
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">NOIS</span>
-                                <span class="tick-label label-right">KBD</span>
-                                <div class="knob global-knob" id="knob-in-bal" data-val="20"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">SIG BAL</span>
-                        </div>
-
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">MIN</span>
-                                <span class="tick-label label-right">MAX</span>
-                                <div class="knob global-knob" id="knob-mic-lvl" data-val="85"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">MIC LVL</span>
-                        </div>
-                    </div>
-
-                    <div class="panel-divider"></div>
-
-                    <!-- MODULATION -->
-                    <div class="flex items-center gap-6 relative">
-                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e5dbc4] px-2">MODULATION</span>
-                        
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">SLW</span>
-                                <span class="tick-label label-right">FST</span>
-                                <div class="knob global-knob" id="knob-v-speed" data-val="50"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. SPEED</span>
-                        </div>
-
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">0</span>
-                                <span class="tick-label label-right">10</span>
-                                <div class="knob global-knob" id="knob-v-depth" data-val="0"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. DEPTH</span>
-                        </div>
-
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">0</span>
-                                <span class="tick-label label-right">10</span>
-                                <div class="knob global-knob" id="knob-accent" data-val="0"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">ACCENT</span>
-                        </div>
-                    </div>
-
-                    <div class="panel-divider"></div>
-
-                    <!-- FINAL STAGE -->
-                    <div class="flex items-center gap-6 relative">
-                        <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e2d8bd] px-2">FINAL STAGE</span>
-
-                        <div class="flex flex-col items-center justify-center h-full mt-2">
-                            <button id="btn-ensemble" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm whitespace-nowrap">OFF</button>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-2">ENSEMBLE</span>
-                        </div>
-
-                        <div class="knob-wrapper mt-2">
-                            <div class="tick-container">
-                                <div class="tick-ring"></div>
-                                <span class="tick-label label-left">VOC</span>
-                                <span class="tick-label label-right">SIM</span>
-                                <div class="knob global-knob" id="knob-out-bal" data-val="0"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-[#1f1a14] mt-1">OUT BAL</span>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- KEYBOARD SECTION -->
-            <div class="w-full flex gap-6 items-end">
-                <div class="flex flex-col items-center gap-2 mb-1 flex-shrink-0">
-                    <button id="btn-latch" class="tactile-button text-[9px] font-bold w-full py-1.5 rounded-sm mb-1" title="Hold notes indefinitely">LATCH</button>
-                    <div class="pitch-wheel-wrapper">
-                        <input type="range" id="ctrl-pitch-wheel" min="-7" max="7" value="0" class="pitch-wheel">
-                    </div>
-                    <span class="text-[10px] font-bold text-[#1f1a14]">PITCH</span>
-                </div>
-                
-                <!-- 32 Key Dynamic Bed -->
-                <div class="keyboard-bed flex-1" id="keyboardContainer">
-                    <!-- Keys injected via JS -->
-                </div>
-            </div>
-
-            <!-- FOOTER -->
-            <div class="flex justify-between items-center w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
-                <div class="text-[9px] text-[#82796e] font-mono tracking-widest">
-                    QWERTY: Z-M (LOWER) / Q-I (UPPER)
-                </div>
-                <div class="text-[10px] text-[#38342e] font-mono font-bold tracking-widest">
-                    &copy; JOSE VELAZQUEZ MA / <a href="https://voltageandwave.co.uk/" target="_blank" rel="noopener noreferrer" class="hover:text-[#c83a2a] underline transition-colors">VOLTAGE &amp; WAVE</a>
-                </div>
-            </div>
-
-        </div>
-        <div class="wooden-ear wooden-ear-right"></div>
-    </div>
-
-    <script>
-        class VWVocoder {
-            constructor() {
-                this.audioCtx = null;
-                this.micStream = null;
-                this.isActive = false;
-                
-                this.numBands = 20;
-                this.bandNodes = [];
-                this.activeVoices = new Map();
-                
-                // Hardware specs: 32 keys, F2 to C5
-                this.baseMidiNote = 41; 
-                this.numKeys = 32;
-                this.latchMode = false;
-
-                this.micGain = null;
-                this.noiseGen = null;
-                this.noiseGain = null;
-                this.synthMasterGain = null;
-                this.carrierMix = null;
-                this.ensembleNode = null;
-                this.dryGain = null; 
-                this.wetGain = null; 
-
-                this.vibratoLFO = null;
-                this.vibratoGain = null;
-                
-                // DAW Setup
-                this.recordDestination = null;
-                this.mediaRecorder = null;
-                this.recordedChunks = [];
-                this.isRecording = false;
-                this.recordStartTime = 0;
-                this.recordTimerInterval = null;
-                
-                // Logarithmic 20-band distribution
-                this.frequencies = [
-                    80, 110, 150, 200, 270, 360, 480, 640, 850, 1100, 
-                    1450, 1900, 2500, 3300, 4300, 5600, 7300, 9500, 12000, 15000
-                ];
-
-                // QWERTY Mapping (F2 to C5 across two rows)
-                this.qwertyMap = {
-                    'z': 41, 's': 42, 'x': 43, 'd': 44, 'c': 45, 'f': 46, 'v': 47,
-                    'b': 48, 'h': 49, 'n': 50, 'j': 51, 'm': 52, 
-                    ',': 53, 'l': 54, '.': 55, ';': 56, '/': 57,
-                    'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67, '6': 68, 'y': 69, '7': 70, 'u': 71, 'i': 72
-                };
-
-                this.setupKeyboardUI();
-                this.bindControls();
-                this.setupDAW();
-            }
-
-            async init() {
-                if (this.audioCtx) return;
-                
-                const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-                this.audioCtx = new AudioCtxClass();
-                
-                this.dryGain = this.audioCtx.createGain(); 
-                this.wetGain = this.audioCtx.createGain(); 
-                
-                this.ensembleNode = this.createEnsembleEffect();
-                
-                const compressor = this.audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -3;
-                compressor.ratio.value = 4;
-                compressor.attack.value = 0.01;
-                
-                this.dryGain.connect(compressor);
-                this.wetGain.connect(this.ensembleNode.input);
-                this.ensembleNode.output.connect(compressor);
-                compressor.connect(this.audioCtx.destination);
-
-                // DAW routing: Record the final compressed master out
-                this.recordDestination = this.audioCtx.createMediaStreamDestination();
-                compressor.connect(this.recordDestination);
-
-                await this.setupMicrophone();
-
-                this.carrierMix = this.audioCtx.createGain();
-                this.synthMasterGain = this.audioCtx.createGain();
-                this.noiseGain = this.audioCtx.createGain();       
-                this.synthMasterGain.connect(this.carrierMix);
-                this.noiseGain.connect(this.carrierMix);
-                
-                this.buildNoiseGenerator();
-                this.buildVibratoLFO();
-                this.buildVocoderBank();
-                this.setupCRTAnalyzer();
-
-                this.isActive = true;
-                this.updateVocoderParams();
-            }
-
-            async setupMicrophone() {
-                try {
-                    this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    const micSource = this.audioCtx.createMediaStreamSource(this.micStream);
-                    
-                    // Add Pre-emphasis (HighShelf boost) to make consonants punch through
-                    const preEmphasis = this.audioCtx.createBiquadFilter();
-                    preEmphasis.type = 'highshelf';
-                    preEmphasis.frequency.value = 3000;
-                    preEmphasis.gain.value = 8;
-
-                    // Add mic compressor to level out speech dynamics
-                    const micComp = this.audioCtx.createDynamicsCompressor();
-                    micComp.threshold.value = -24;
-                    micComp.ratio.value = 8;
-                    micComp.attack.value = 0.005;
-
-                    micSource.connect(preEmphasis);
-                    preEmphasis.connect(micComp);
-                    
-                    this.micGain = this.audioCtx.createGain();
-                    micComp.connect(this.micGain);
-                    
-                    this.micGain.connect(this.dryGain); // To Simulator Out
-
-                    const btn = document.getElementById('btn-power');
-                    btn.classList.add('is-active');
-                    document.getElementById('status-mic').innerText = "MIC: ACTIVE";
-                    document.getElementById('status-mic').classList.replace('opacity-40', 'opacity-100');
-                } catch (err) {
-                    alert("Microphone access is required for the vocoder Modulator.");
-                }
-            }
-
-            createRectifierCurve() {
-                const n = 44100;
-                const curve = new Float32Array(n);
-                for (let i = 0; i < n; ++i) curve[i] = Math.abs(i * 2 / n - 1);
-                return curve;
-            }
-
-            buildVocoderBank() {
-                const rectifierCurve = this.createRectifierCurve();
-
-                this.frequencies.forEach((freq) => {
-                    const qFactor = 5;
-
-                    // Modulator (Voice) - Cascaded 24dB/oct for sharp isolation
-                    const modFilter1 = this.audioCtx.createBiquadFilter();
-                    modFilter1.type = 'bandpass'; modFilter1.frequency.value = freq; modFilter1.Q.value = qFactor;
-                    const modFilter2 = this.audioCtx.createBiquadFilter();
-                    modFilter2.type = 'bandpass'; modFilter2.frequency.value = freq; modFilter2.Q.value = qFactor;
-                    
-                    if(this.micGain) this.micGain.connect(modFilter1);
-                    modFilter1.connect(modFilter2);
-
-                    // Envelope Follower
-                    const rectifier = this.audioCtx.createWaveShaper();
-                    rectifier.curve = rectifierCurve;
-                    
-                    const envFilter = this.audioCtx.createBiquadFilter();
-                    envFilter.type = 'lowpass';
-                    envFilter.frequency.value = 25; // 25Hz is ideal for vocal amplitude tracking
-
-                    // Crucial: Boost the rectified envelope so the Carrier VCA opens fully
-                    const envBoost = this.audioCtx.createGain();
-                    envBoost.gain.value = 26.0; 
-
-                    modFilter2.connect(rectifier);
-                    rectifier.connect(envFilter);
-                    envFilter.connect(envBoost);
-
-                    // Carrier (Synth) - Cascaded 24dB/oct
-                    const carFilter1 = this.audioCtx.createBiquadFilter();
-                    carFilter1.type = 'bandpass'; carFilter1.frequency.value = freq; carFilter1.Q.value = qFactor;
-                    const carFilter2 = this.audioCtx.createBiquadFilter();
-                    carFilter2.type = 'bandpass'; carFilter2.frequency.value = freq; carFilter2.Q.value = qFactor;
-                    
-                    this.carrierMix.connect(carFilter1);
-                    carFilter1.connect(carFilter2);
-
-                    // VCA Stage
-                    const vca = this.audioCtx.createGain();
-                    vca.gain.value = 0;
-                    
-                    carFilter2.connect(vca);
-                    envBoost.connect(vca.gain); // Modulates carrier amplitude
-                    vca.connect(this.wetGain);
-                });
-            }
-
-            buildNoiseGenerator() {
-                const bufferSize = this.audioCtx.sampleRate * 2;
-                const noiseBuffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
-                const output = noiseBuffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-                
-                this.noiseGen = this.audioCtx.createBufferSource();
-                this.noiseGen.buffer = noiseBuffer;
-                this.noiseGen.loop = true;
-                
-                // Highpass noise to only provide sibilance (S, T sounds)
-                const hpFilter = this.audioCtx.createBiquadFilter();
-                hpFilter.type = 'highpass';
-                hpFilter.frequency.value = 4000;
-                
-                this.noiseGen.connect(hpFilter);
-                hpFilter.connect(this.noiseGain);
-                this.noiseGen.start();
-            }
-
-            buildVibratoLFO() {
-                this.vibratoLFO = this.audioCtx.createOscillator();
-                this.vibratoLFO.type = 'sine';
-                this.vibratoGain = this.audioCtx.createGain();
-                this.vibratoLFO.connect(this.vibratoGain);
-                this.vibratoLFO.start();
-            }
-
-            createEnsembleEffect() {
-                const input = this.audioCtx.createGain();
-                const output = this.audioCtx.createGain();
-                
-                const dry = this.audioCtx.createGain();
-                input.connect(dry);
-                dry.connect(output);
-
-                const splitNode = this.audioCtx.createChannelSplitter(2);
-                const mergeNode = this.audioCtx.createChannelMerger(2);
-                input.connect(splitNode);
-
-                // 3-Phase Chorus using independent slightly offset LFOs
-                const rates = [0.5, 0.6, 0.7]; 
-                
-                [0, 1].forEach((channel) => {
-                    const delay = this.audioCtx.createDelay();
-                    delay.delayTime.value = 0.02; // 20ms base
-                    
-                    const lfo = this.audioCtx.createOscillator();
-                    lfo.type = 'sine';
-                    lfo.frequency.value = rates[channel];
-                    
-                    const depth = this.audioCtx.createGain();
-                    depth.gain.value = channel === 0 ? 0.005 : -0.005; 
-                    
-                    lfo.connect(depth);
-                    depth.connect(delay.delayTime);
-                    lfo.start();
-                    
-                    splitNode.connect(delay, channel);
-                    delay.connect(mergeNode, 0, channel);
-                });
-
-                const wet = this.audioCtx.createGain();
-                wet.gain.value = 0; 
-                mergeNode.connect(wet);
-                wet.connect(output);
-
-                return { input, output, wetGain: wet };
-            }
-
-            noteOn(midiNote) {
-                if (!this.isActive) return;
-
-                if (this.latchMode && this.activeVoices.has(midiNote)) {
-                    this.noteOff(midiNote, true); // Toggle off if already latched
-                    return;
-                }
-
-                if (this.activeVoices.has(midiNote)) return;
-
-                const isOctaveUp = document.getElementById('btn-octave').innerText.includes("8'");
-                const actualMidi = isOctaveUp ? midiNote + 12 : midiNote;
-                
-                const tuneCents = (parseFloat(document.getElementById('knob-tune').dataset.val) / 100) * 200 - 100;
-                const pitchWheel = parseFloat(document.getElementById('ctrl-pitch-wheel').value); 
-                const totalSemitones = actualMidi - 69 + pitchWheel + (tuneCents / 100);
-                const targetFreq = 440 * Math.pow(2, totalSemitones / 12);
-
-                // Carrier consists of Sawtooth + Pulse + Sub for extreme harmonic density
-                const oscMain = this.audioCtx.createOscillator();
-                oscMain.type = 'sawtooth'; 
-                oscMain.frequency.value = targetFreq;
-
-                const oscPulse = this.audioCtx.createOscillator();
-                oscPulse.type = 'square';
-                oscPulse.frequency.value = targetFreq;
-
-                const oscSub = this.audioCtx.createOscillator();
-                oscSub.type = 'square';
-                oscSub.frequency.value = targetFreq / 2;
-
-                const voiceGain = this.audioCtx.createGain();
-                voiceGain.gain.value = 0.4; // Mix level
-
-                this.vibratoGain.connect(oscMain.detune);
-                this.vibratoGain.connect(oscPulse.detune);
-                this.vibratoGain.connect(oscSub.detune);
-
-                // Accent Bend
-                const accentVal = parseFloat(document.getElementById('knob-accent').dataset.val) / 100;
-                if (accentVal > 0) {
-                    const bendAmount = accentVal * 300; // sharper drop
-                    const t = this.audioCtx.currentTime;
-                    [oscMain, oscPulse, oscSub].forEach(o => {
-                        o.frequency.setValueAtTime(targetFreq + bendAmount, t);
-                        o.frequency.exponentialRampToValueAtTime(targetFreq, t + 0.1);
-                    });
-                }
-
-                oscMain.connect(voiceGain);
-                oscPulse.connect(voiceGain);
-                oscSub.connect(voiceGain);
-                voiceGain.connect(this.synthMasterGain);
-                
-                oscMain.start(); oscPulse.start(); oscSub.start();
-                this.activeVoices.set(midiNote, { oscMain, oscPulse, oscSub, voiceGain });
-
-                // UI Update
-                const keyEl = document.querySelector(`[data-note="${midiNote}"]`);
-                if (keyEl) keyEl.classList.add('active-key');
-            }
-
-            noteOff(midiNote, force = false) {
-                if (!this.activeVoices.has(midiNote)) return;
-                if (this.latchMode && !force) return;
-
-                const voice = this.activeVoices.get(midiNote);
-                voice.oscMain.stop(); voice.oscPulse.stop(); voice.oscSub.stop();
-                voice.voiceGain.disconnect();
-                this.activeVoices.delete(midiNote);
-
-                // UI Update
-                const keyEl = document.querySelector(`[data-note="${midiNote}"]`);
-                if (keyEl) keyEl.classList.remove('active-key');
-            }
-
-            setupKeyboardUI() {
-                const kb = document.getElementById('keyboardContainer');
-                kb.innerHTML = '';
-                
-                const totalWhiteKeys = 19; 
-                let whiteIndex = 0;
-                
-                // Pattern: W, B, W, B, W, W, B, W, B, W, B, W (starts on F)
-                const isBlackPattern = [false, true, false, true, false, false, true, false, true, false, true, false];
-                
-                // For UI Hints
-                const revQwertyMap = {};
-                for (const [char, note] of Object.entries(this.qwertyMap)) {
-                    revQwertyMap[note] = char.toUpperCase();
-                }
-                
-                for (let i = 0; i < this.numKeys; i++) {
-                    const midiNote = this.baseMidiNote + i;
-                    const isBlack = isBlackPattern[i % 12];
-                    
-                    const btn = document.createElement('div');
-                    btn.dataset.note = midiNote;
-                    
-                    const hintChar = revQwertyMap[midiNote] || '';
-                    
-                    if (isBlack) {
-                        btn.className = `key-black`;
-                        // Position exactly on the border of the preceding white key
-                        const leftPercent = ((whiteIndex) / totalWhiteKeys) * 100;
-                        btn.style.left = `${leftPercent}%`;
-                        if (hintChar) btn.innerHTML = `<span class="kbd-hint" style="color: #666; bottom: 8px;">${hintChar}</span>`;
-                    } else {
-                        btn.className = `key-white`;
-                        if (hintChar) btn.innerHTML = `<span class="kbd-hint">${hintChar}</span>`;
-                        whiteIndex++;
-                    }
-                    
-                    const triggerOn = (e) => { e.preventDefault(); this.noteOn(midiNote); };
-                    const triggerOff = (e) => { e.preventDefault(); this.noteOff(midiNote); };
-                    
-                    btn.addEventListener('pointerdown', triggerOn);
-                    btn.addEventListener('pointerup', triggerOff);
-                    btn.addEventListener('pointerleave', triggerOff);
-                    btn.addEventListener('pointercancel', triggerOff);
-
-                    kb.appendChild(btn);
-                }
-
-                const wheel = document.getElementById('ctrl-pitch-wheel');
-                wheel.addEventListener('pointerup', () => { wheel.value = 0; this.updateActivePitches(); });
-                wheel.addEventListener('pointercancel', () => { wheel.value = 0; this.updateActivePitches(); });
-            }
-
-            updateActivePitches() {
-                if(!this.isActive) return;
-                const isOctaveUp = document.getElementById('btn-octave').innerText.includes("8'");
-                const tuneCents = (parseFloat(document.getElementById('knob-tune').dataset.val) / 100) * 200 - 100;
-                const pitchWheel = parseFloat(document.getElementById('ctrl-pitch-wheel').value);
-
-                this.activeVoices.forEach((voice, midiNote) => {
-                    const actualMidi = isOctaveUp ? midiNote + 12 : midiNote;
-                    const totalSemitones = actualMidi - 69 + pitchWheel + (tuneCents / 100);
-                    const targetFreq = 440 * Math.pow(2, totalSemitones / 12);
-                    
-                    const t = this.audioCtx.currentTime;
-                    voice.oscMain.frequency.setTargetAtTime(targetFreq, t, 0.05);
-                    voice.oscPulse.frequency.setTargetAtTime(targetFreq, t, 0.05);
-                    voice.oscSub.frequency.setTargetAtTime(targetFreq / 2, t, 0.05);
-                });
-            }
-
-            bindControls() {
-                document.getElementById('btn-power').addEventListener('click', () => this.init());
-
-                const latchBtn = document.getElementById('btn-latch');
-                latchBtn.addEventListener('click', () => {
-                    this.latchMode = !this.latchMode;
-                    if (this.latchMode) latchBtn.classList.add('active-toggle');
-                    else {
-                        latchBtn.classList.remove('active-toggle');
-                        // Clear all active notes
-                        const playingNotes = Array.from(this.activeVoices.keys());
-                        playingNotes.forEach(note => this.noteOff(note, true));
-                    }
-                });
-
-                const octBtn = document.getElementById('btn-octave');
-                octBtn.addEventListener('click', () => {
-                    if (octBtn.innerText.includes("16'")) {
-                        octBtn.innerText = "8' UP"; octBtn.classList.add('active-toggle');
-                    } else {
-                        octBtn.innerText = "16' NRM"; octBtn.classList.remove('active-toggle');
-                    }
-                    this.updateActivePitches();
-                });
-
-                const ensBtn = document.getElementById('btn-ensemble');
-                ensBtn.addEventListener('click', () => {
-                    if (ensBtn.innerText === "OFF") {
-                        ensBtn.innerText = "ON"; ensBtn.classList.add('active-toggle');
-                    } else {
-                        ensBtn.innerText = "OFF"; ensBtn.classList.remove('active-toggle');
-                    }
-                    this.updateVocoderParams();
-                });
-
-                document.getElementById('ctrl-pitch-wheel').addEventListener('input', () => this.updateActivePitches());
-
-                // QWERTY Keyboard Listeners
-                document.addEventListener('keydown', (e) => {
-                    if (e.repeat || e.metaKey || e.ctrlKey) return;
-                    const note = this.qwertyMap[e.key.toLowerCase()];
-                    if (note) this.noteOn(note);
-                });
-
-                document.addEventListener('keyup', (e) => {
-                    const note = this.qwertyMap[e.key.toLowerCase()];
-                    if (note) this.noteOff(note);
-                });
-
-                let activeKnob = null, startY = 0, startVal = 0;
-
-                const updateVisual = (knobEl, val) => {
-                    knobEl.style.transform = `rotate(${-135 + (val / 100) * 270}deg)`;
-                };
-
-                document.querySelectorAll('.global-knob').forEach(k => updateVisual(k, k.dataset.val));
-
-                document.addEventListener('pointerdown', async (e) => {
-                    if (e.target.classList.contains('global-knob')) {
-                        await this.init();
-                        activeKnob = e.target;
-                        if (activeKnob.setPointerCapture) activeKnob.setPointerCapture(e.pointerId);
-                        startY = e.clientY; startVal = parseFloat(activeKnob.dataset.val);
-                    }
-                });
-
-                document.addEventListener('pointermove', (e) => {
-                    if (activeKnob) {
-                        let newVal = Math.max(0, Math.min(100, startVal + (startY - e.clientY)));
-                        activeKnob.dataset.val = newVal;
-                        updateVisual(activeKnob, newVal);
-                        this.updateVocoderParams();
-                    }
-                });
-
-                const endDrag = (e) => {
-                    if (activeKnob) {
-                        if (activeKnob.releasePointerCapture && e.pointerId) try { activeKnob.releasePointerCapture(e.pointerId); } catch(err){}
-                        activeKnob = null;
-                    }
-                };
-                document.addEventListener('pointerup', endDrag);
-                document.addEventListener('pointercancel', endDrag);
-
-                document.querySelectorAll('.preset-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active-toggle'));
-                        e.target.classList.add('active-toggle');
-                        this.applyPreset(e.target.dataset.preset, updateVisual);
-                        
-                        const ptchStatus = document.getElementById('status-ptch');
-                        if (ptchStatus) ptchStatus.innerHTML = `PTCH:<br>${e.target.innerText}`;
-                    });
-                });
-            }
-
-            updateVocoderParams() {
-                if (!this.isActive) return;
-
-                const inBal = parseFloat(document.getElementById('knob-in-bal').dataset.val) / 100;
-                this.synthMasterGain.gain.value = Math.max(0, 1.0 - (inBal * 1.2)); // Fade synth out earlier
-                this.noiseGain.gain.value = inBal * 1.5;
-
-                const micLevel = parseFloat(document.getElementById('knob-mic-lvl').dataset.val) / 100;
-                this.micGain.gain.value = micLevel * 2.0;
-
-                const outBal = parseFloat(document.getElementById('knob-out-bal').dataset.val) / 100;
-                this.wetGain.gain.value = Math.max(0, 1.0 - outBal);
-                this.dryGain.gain.value = outBal;
-
-                const vSpeed = 1 + (parseFloat(document.getElementById('knob-v-speed').dataset.val) / 100) * 9;
-                const vDepth = parseFloat(document.getElementById('knob-v-depth').dataset.val);
-                this.vibratoLFO.frequency.value = vSpeed;
-                this.vibratoGain.gain.value = vDepth; 
-
-                const ensOn = document.getElementById('btn-ensemble').innerText === "ON";
-                this.ensembleNode.wetGain.gain.value = ensOn ? 0.7 : 0;
-                
-                this.updateActivePitches();
-            }
-
-            setupCRTAnalyzer() {
-                const canvas = document.getElementById('analyzer-canvas');
-                if (!canvas) return;
-
-                const ctx = canvas.getContext('2d');
-                
-                this.meterAnalyzer = this.audioCtx.createAnalyser();
-                this.meterAnalyzer.fftSize = 64;
-                this.meterData = new Uint8Array(this.meterAnalyzer.frequencyBinCount);
-                
-                // Monitor Wet Out
-                const monitorGain = this.audioCtx.createGain();
-                this.wetGain.connect(monitorGain);
-                monitorGain.connect(this.meterAnalyzer);
-
-                const draw = () => {
-                    requestAnimationFrame(draw);
-                    if(!this.isActive) return;
-
-                    this.meterAnalyzer.getByteFrequencyData(this.meterData);
-
-                    ctx.fillStyle = '#041004';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    ctx.shadowColor = '#0f0';
-                    ctx.shadowBlur = 8;
-                    ctx.fillStyle = '#0f0';
-                    
-                    const barWidth = (canvas.width / 20) - 2;
-                    
-                    for(let i=0; i<20; i++) {
-                        const val = this.meterData[i+2] || 0;
-                        const height = (val / 255) * canvas.height * 0.9;
-                        ctx.fillRect(i * (barWidth + 2) + 2, canvas.height - height, barWidth, height);
-                    }
-                    ctx.shadowBlur = 0;
-                };
-                draw();
-            }
-
-            // DAW Recorder Implementation
-            setupDAW() {
-                const btnRecord = document.getElementById('btnRecord');
-                const recStatus = document.getElementById('recStatus');
-                const btnDownload = document.getElementById('btnDownload');
-
-                if (typeof MediaRecorder === 'undefined') {
-                    btnRecord.disabled = true;
-                    btnRecord.innerText = 'N/A';
-                    btnRecord.classList.add('opacity-40');
-                    recStatus.innerText = 'ERR';
-                    return;
-                }
-
-                btnRecord.addEventListener('click', async () => {
-                    if (!this.isActive) await this.init();
-
-                    if (!this.isRecording) {
-                        this.recordedChunks = [];
-                        let options;
-                        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) options = { mimeType: 'audio/webm;codecs=opus' };
-                        else if (MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/webm' };
-                        
-                        this.mediaRecorder = new MediaRecorder(this.recordDestination.stream, options);
-
-                        this.mediaRecorder.ondataavailable = (e) => {
-                            if (e.data && e.data.size > 0) this.recordedChunks.push(e.data);
-                        };
-
-                        this.mediaRecorder.onstop = async () => {
-                            recStatus.innerText = 'WAIT';
-                            const rawBlob = new Blob(this.recordedChunks, { type: this.mediaRecorder.mimeType || 'audio/webm' });
-                            try {
-                                const arrayBuffer = await rawBlob.arrayBuffer();
-                                const decoded = await this.audioCtx.decodeAudioData(arrayBuffer);
-                                const wavBlob = this.audioBufferToWav(decoded);
-                                btnDownload.href = URL.createObjectURL(wavBlob);
-                                btnDownload.download = this.recordingFilename('wav');
-                            } catch (err) {
-                                btnDownload.href = URL.createObjectURL(rawBlob);
-                                btnDownload.download = this.recordingFilename('webm');
-                            }
-                            
-                            btnDownload.classList.remove('opacity-40', 'pointer-events-none');
-                            btnDownload.style.color = '#86efac'; // Highlight download
-                            recStatus.innerText = '00:00';
-                        };
-
-                        this.mediaRecorder.start();
-                        this.isRecording = true;
-                        this.recordStartTime = Date.now();
-                        
-                        btnRecord.classList.add('active-toggle');
-                        btnRecord.innerText = '■ STP';
-                        
-                        btnDownload.classList.add('opacity-40', 'pointer-events-none');
-                        btnDownload.style.color = '';
-
-                        this.recordTimerInterval = setInterval(() => {
-                            const elapsed = Math.floor((Date.now() - this.recordStartTime) / 1000);
-                            const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                            const ss = String(elapsed % 60).padStart(2, '0');
-                            recStatus.innerText = `${mm}:${ss}`;
-                        }, 500);
-                    } else {
-                        this.mediaRecorder.stop();
-                        this.isRecording = false;
-                        clearInterval(this.recordTimerInterval);
-                        btnRecord.classList.remove('active-toggle');
-                        btnRecord.innerText = '● REC';
-                    }
-                });
-            }
-
-            // WAV Encoding Helpers
-            audioBufferToWav(buffer) {
-                const numChannels = buffer.numberOfChannels;
-                const sampleRate = buffer.sampleRate;
-                const samples = numChannels === 2
-                    ? this.interleaveChannels(buffer.getChannelData(0), buffer.getChannelData(1))
-                    : buffer.getChannelData(0);
-
-                const bytesPerSample = 2;
-                const blockAlign = numChannels * bytesPerSample;
-                const dataSize = samples.length * bytesPerSample;
-                const arrayBuffer = new ArrayBuffer(44 + dataSize);
-                const view = new DataView(arrayBuffer);
-
-                this.writeAscii(view, 0, 'RIFF');
-                view.setUint32(4, 36 + dataSize, true);
-                this.writeAscii(view, 8, 'WAVE');
-                this.writeAscii(view, 12, 'fmt ');
-                view.setUint32(16, 16, true);
-                view.setUint16(20, 1, true);
-                view.setUint16(22, numChannels, true);
-                view.setUint32(24, sampleRate, true);
-                view.setUint32(28, sampleRate * blockAlign, true);
-                view.setUint16(32, blockAlign, true);
-                view.setUint16(34, 16, true);
-                this.writeAscii(view, 36, 'data');
-                view.setUint32(40, dataSize, true);
-
-                let offset = 44;
-                for (let i = 0; i < samples.length; i++, offset += 2) {
-                    const s = Math.max(-1, Math.min(1, samples[i]));
-                    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-                }
-                return new Blob([view], { type: 'audio/wav' });
-            }
-
-            interleaveChannels(left, right) {
-                const result = new Float32Array(left.length + right.length);
-                let idx = 0;
-                for (let i = 0; i < left.length; i++) {
-                    result[idx++] = left[i];
-                    result[idx++] = right[i];
-                }
-                return result;
-            }
-
-            writeAscii(view, offset, text) { 
-                for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)); 
-            }
-
-            recordingFilename(ext) {
-                const d = new Date();
-                const pad = (n) => String(n).padStart(2, '0');
-                const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
-                return `av20-recording-${stamp}.${ext}`;
-            }
-
-            applyPreset(name, updateVisual) {
-                const presets = {
-                    classic: { tune: 50, oct: "16' NRM", inBal: 20, mic: 85, vSpd: 50, vDep: 0, acc: 0, ens: "OFF", outBal: 0 },
-                    robot:   { tune: 50, oct: "16' NRM", inBal: 0, mic: 90, vSpd: 0, vDep: 0, acc: 0, ens: "OFF", outBal: 0 },
-                    choir:   { tune: 50, oct: "8' UP", inBal: 25, mic: 85, vSpd: 65, vDep: 15, acc: 30, ens: "ON", outBal: 0 },
-                    whisper: { tune: 50, oct: "16' NRM", inBal: 100, mic: 95, vSpd: 0, vDep: 0, acc: 0, ens: "ON", outBal: 0 }
-                };
-                
-                const p = presets[name];
-                if(!p) return;
-
-                const setKnob = (id, val) => { const el = document.getElementById(id); el.dataset.val = val; updateVisual(el, val); };
-
-                setKnob('knob-tune', p.tune);
-                setKnob('knob-in-bal', p.inBal);
-                setKnob('knob-mic-lvl', p.mic);
-                setKnob('knob-v-speed', p.vSpd);
-                setKnob('knob-v-depth', p.vDep);
-                setKnob('knob-accent', p.acc);
-                setKnob('knob-out-bal', p.outBal);
-
-                const octBtn = document.getElementById('btn-octave');
-                octBtn.innerText = p.oct;
-                if(p.oct.includes("8'")) octBtn.classList.add('active-toggle'); else octBtn.classList.remove('active-toggle');
-
-                const ensBtn = document.getElementById('btn-ensemble');
-                ensBtn.innerText = p.ens;
-                if(p.ens === "ON") ensBtn.classList.add('active-toggle'); else ensBtn.classList.remove('active-toggle');
-
-                if(this.isActive) this.updateVocoderParams();
-            }
+<div class="synth-enclosure">
+<div class="wooden-ear wooden-ear-left"></div>
+<div class="chassis">
+<div class="rack-bolt bolt-tl"></div><div class="rack-bolt bolt-tr"></div><div class="rack-bolt bolt-bl"></div><div class="rack-bolt bolt-br"></div>
+
+<!-- HEADER -->
+<div class="flex items-center justify-between w-full mb-8 pb-5 border-b-2 border-[#38342e]/40">
+ <div class="flex flex-col gap-2 flex-shrink-0">
+  <div class="flex items-center gap-1.5 select-none">
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">V</span></div>
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">&amp;</span></div>
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center mr-3"><span class="logo-char font-mono font-black text-xl">W</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">A</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">V</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">-</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">2</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">0</span></div>
+  </div>
+  <div class="flex items-center justify-between w-full text-[9px] font-mono font-bold tracking-widest text-[#38342e] border-t border-[#38342e]/30 pt-1.5 mt-1">
+   <span>20-BAND VOCODER</span><span class="text-[#c83a2a]">•</span><span>ANALOG EMULATOR</span>
+  </div>
+ </div>
+
+ <div class="crt-screen w-[260px] h-[72px] flex items-center justify-between px-3 py-2 flex-shrink-0 mx-6">
+  <canvas id="analyzer-canvas" width="170" height="50" class="z-10 h-full"></canvas>
+  <div class="text-[#0f0] font-mono text-[9px] text-right leading-tight z-10 flex flex-col justify-center h-full pl-2 border-l border-[#0f0]/30 ml-2 gap-1.5 flex-1">
+   <div id="status-mic" class="opacity-40 whitespace-nowrap">MIC: OFF</div>
+   <div id="status-ptch" class="text-[#ffaa00] whitespace-nowrap">PTCH:<br>CLASSIC</div>
+  </div>
+ </div>
+
+ <div class="flex items-end justify-between gap-6 flex-shrink-0">
+  <div class="flex flex-col gap-2 items-center flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">DAW Recorder</span>
+   <div class="flex gap-2 items-center">
+    <button id="btnRecord" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold whitespace-nowrap">● REC</button>
+    <div id="recStatus" class="font-mono font-bold text-[#1f1a14] bg-[#e2dbc8] text-[10px] w-12 text-center py-1.5 rounded border border-[#38342e]/30">00:00</div>
+    <a id="btnDownload" href="#" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold text-center opacity-40 pointer-events-none whitespace-nowrap">SAVE</a>
+   </div>
+  </div>
+  <div class="flex flex-col gap-2 items-center flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">Patch Memory</span>
+   <div class="grid grid-cols-2 gap-1.5 w-[140px]">
+    <button class="tactile-button active-toggle text-[9px] py-1 rounded-sm preset-btn" data-preset="classic">CLASSIC</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="robot">ROBOT</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="choir">CHOIR</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="whisper">WHISPER</button>
+   </div>
+  </div>
+  <div class="flex flex-col items-center gap-2 flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">Power</span>
+   <button id="btn-power" class="rocker-button text-white w-12 h-10 font-black rounded-sm flex items-center justify-center">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>
+   </button>
+  </div>
+ </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="panel-outline w-full px-6 py-8 mb-8 flex justify-between items-center overflow-x-auto">
+<div class="flex flex-nowrap items-center justify-between min-w-max gap-5 mx-auto w-full">
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#ece6d5] px-2">OSCILLATOR</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">-100</span><span class="tick-label label-top">0</span><span class="tick-label label-right">+100</span><div class="knob global-knob" id="knob-tune" data-val="50"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">TUNE</span></div>
+  <div class="flex flex-col items-center justify-center h-full mt-2"><button id="btn-octave" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm active-toggle whitespace-nowrap">16' NRM</button><span class="text-[10px] font-bold text-[#1f1a14] mt-2">OCTAVE</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e9e1cd] px-2">SIGNAL MIXER</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">KBD</span><span class="tick-label label-right">NOIS</span><div class="knob global-knob" id="knob-in-bal" data-val="20"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">SIG BAL</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">MIN</span><span class="tick-label label-right">MAX</span><div class="knob global-knob" id="knob-mic-lvl" data-val="85"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">MIC LVL</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e5dbc4] px-2">MODULATION</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">SLW</span><span class="tick-label label-right">FST</span><div class="knob global-knob" id="knob-v-speed" data-val="50"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. SPEED</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">0</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-v-depth" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. DEPTH</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">0</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-accent" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">ACCENT</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e2d8bd] px-2">FINAL STAGE</span>
+  <div class="flex flex-col items-center justify-center h-full mt-2"><button id="btn-ensemble" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm whitespace-nowrap">OFF</button><span class="text-[10px] font-bold text-[#1f1a14] mt-2">ENSEMBLE</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">SIM</span><span class="tick-label label-right">MIC</span><div class="knob global-knob" id="knob-out-bal" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">OUT BAL</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">OFF</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-final-vol" data-val="80"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">FINAL VOL</span></div>
+ </div>
+
+</div>
+</div>
+
+<!-- KEYBOARD -->
+<div class="w-full flex gap-6 items-end">
+ <div class="flex flex-col items-center gap-2 mb-1 flex-shrink-0">
+  <button id="btn-latch" class="tactile-button text-[9px] font-bold w-full py-1.5 rounded-sm mb-1" title="Hold notes indefinitely">LATCH</button>
+  <div class="pitch-wheel-wrapper"><input type="range" id="ctrl-pitch-wheel" min="-7" max="7" step="0.05" value="0" class="pitch-wheel"></div>
+  <span class="text-[10px] font-bold text-[#1f1a14]">PITCH</span>
+ </div>
+ <div class="keyboard-bed flex-1" id="keyboardContainer"></div>
+</div>
+
+<div class="flex justify-between items-center w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
+ <div class="text-[9px] text-[#82796e] font-mono tracking-widest">QWERTY: Z-/ (LOWER) / Q-I (UPPER) · USE HEADPHONES</div>
+ <div class="text-[10px] text-[#38342e] font-mono font-bold tracking-widest">&copy; JOSE VELAZQUEZ MA / <a href="https://voltageandwave.co.uk/" target="_blank" rel="noopener noreferrer" class="hover:text-[#c83a2a] underline transition-colors">VOLTAGE &amp; WAVE</a></div>
+</div>
+
+</div>
+<div class="wooden-ear wooden-ear-right"></div>
+</div>
+
+<script>
+class VWVocoder {
+    constructor() {
+        this.ctx = null; this.isActive = false; this.initPromise = null;
+        this.voices = new Map(); this.latch = false;
+        this.base = 41;           // F2 (VC-10: 32 keys, F to C)
+        this.n = 32;
+        this.freqs = [80,110,150,200,270,360,480,640,850,1100,1450,1900,2500,3300,4300,5600,7300,9500,12000,15000];
+        // Layout-independent mapping (event.code). Z-row = F2..A3, Q-row = C4..C5
+        this.keyMap = {
+            KeyZ:41,KeyS:42,KeyX:43,KeyD:44,KeyC:45,KeyF:46,KeyV:47,KeyB:48,KeyH:49,KeyN:50,KeyJ:51,KeyM:52,
+            Comma:53,KeyL:54,Period:55,Semicolon:56,Slash:57,
+            KeyQ:60,Digit2:61,KeyW:62,Digit3:63,KeyE:64,KeyR:65,Digit5:66,KeyT:67,Digit6:68,KeyY:69,Digit7:70,KeyU:71,KeyI:72
+        };
+        this.rec = { mr: null, chunks: [], on: false, t0: 0, timer: null };
+        this.buildKeyboard();
+        this.bindControls();
+        this.setupDAW();
+    }
+
+    $(id) { return document.getElementById(id); }
+    k(id, d = 0) { const e = this.$(id); return e ? parseFloat(e.dataset.val) / 100 : d; }
+    set(param, v) { param.setTargetAtTime(v, this.ctx.currentTime, 0.02); }
+
+    init() { return this.initPromise || (this.initPromise = this._init()); }
+
+    async _init() {
+        const C = window.AudioContext || window.webkitAudioContext;
+        const ctx = this.ctx = new C();
+
+        // Block diagram: Simulator -> OUTPUT BALANCE -> ENSEMBLE -> FINAL OUT
+        this.wetGain = ctx.createGain();   // SIMULATOR side
+        this.dryGain = ctx.createGain();   // MIC side
+        const bal = ctx.createGain();
+        this.ens = this.createEnsemble();
+        this.master = ctx.createGain();
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -6; comp.ratio.value = 4;
+        this.wetGain.connect(bal); this.dryGain.connect(bal);
+        bal.connect(this.ens.input); this.ens.output.connect(this.master);
+        this.master.connect(comp); comp.connect(ctx.destination);
+        this.recordDestination = ctx.createMediaStreamDestination();
+        comp.connect(this.recordDestination);
+
+        this.micGain = ctx.createGain();
+        this.micGain.connect(this.dryGain);
+        await this.setupMic();
+
+        // Carrier: keyboard + noise generator
+        this.carrier = ctx.createGain();
+        this.kbdGain = ctx.createGain(); this.noiseGain = ctx.createGain();
+        this.kbdGain.connect(this.carrier); this.noiseGain.connect(this.carrier);
+        this.buildNoise();
+        this.vibLFO = ctx.createOscillator(); this.vibGain = ctx.createGain();
+        this.vibLFO.connect(this.vibGain); this.vibLFO.start();
+        this.buildBank();
+        this.setupAnalyzer();
+
+        if (ctx.state === 'suspended') await ctx.resume();
+        this.isActive = true;
+        this.updateParams(true);
+    }
+
+    async setupMic() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false
+            });
+            const src = this.ctx.createMediaStreamSource(stream);
+            const pre = this.ctx.createBiquadFilter();   // pre-emphasis for consonants
+            pre.type = 'highshelf'; pre.frequency.value = 3000; pre.gain.value = 8;
+            const mc = this.ctx.createDynamicsCompressor();
+            mc.threshold.value = -24; mc.ratio.value = 8; mc.attack.value = 0.005;
+            src.connect(pre); pre.connect(mc); mc.connect(this.micGain);
+            this.$('btn-power').classList.add('is-active');
+            const s = this.$('status-mic'); s.innerText = 'MIC: ACTIVE'; s.classList.replace('opacity-40', 'opacity-100');
+        } catch (e) {
+            alert('Microphone access is required for the vocoder modulator.');
         }
+    }
 
-        window.addEventListener('DOMContentLoaded', () => { window.synthInstance = new VWVocoder(); });
-    </script>
+    buildBank() {
+        const ctx = this.ctx;
+        // full-wave rectifier
+        const rc = new Float32Array(4097);
+        for (let i = 0; i < rc.length; i++) rc[i] = Math.abs(i * 2 / (rc.length - 1) - 1);
+        // VCA control clamp: no negative gain, soft ceiling
+        const cc = new Float32Array(4097);
+        for (let i = 0; i < cc.length; i++) { const x = i * 2 / (cc.length - 1) - 1; cc[i] = x <= 0 ? 0 : Math.tanh(1.5 * x); }
+
+        this.bandSum = ctx.createGain();
+        this.bandSum.connect(this.wetGain);
+
+        const bp = (f) => { const b = ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = 5; return b; };
+        this.freqs.forEach(f => {
+            const m1 = bp(f), m2 = bp(f);
+            this.micGain.connect(m1); m1.connect(m2);
+            const rect = ctx.createWaveShaper(); rect.curve = rc;
+            const env = ctx.createBiquadFilter(); env.type = 'lowpass'; env.frequency.value = 25;
+            const boost = ctx.createGain(); boost.gain.value = 26;
+            const clamp = ctx.createWaveShaper(); clamp.curve = cc;
+            m2.connect(rect); rect.connect(env); env.connect(boost); boost.connect(clamp);
+
+            const c1 = bp(f), c2 = bp(f);
+            this.carrier.connect(c1); c1.connect(c2);
+            const vca = ctx.createGain(); vca.gain.value = 0;
+            c2.connect(vca); clamp.connect(vca.gain);
+            vca.connect(this.bandSum);
+        });
+    }
+
+    buildNoise() {
+        // Full-band white noise (VC-10 noise generator), always running
+        const ctx = this.ctx, len = ctx.sampleRate * 2;
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+        src.connect(this.noiseGain); src.start();
+    }
+
+    createEnsemble() {
+        // 3-phase chorus, applied AFTER output balance (per manual)
+        const c = this.ctx, input = c.createGain(), output = c.createGain();
+        const dry = c.createGain(), wet = c.createGain(), merger = c.createChannelMerger(2);
+        input.connect(dry); dry.connect(output);
+        const pans = [[1, 0], [0.7, 0.7], [0, 1]];
+        for (let i = 0; i < 3; i++) {
+            const ph = i * 2 * Math.PI / 3;
+            const wave = c.createPeriodicWave(new Float32Array([0, Math.sin(ph)]), new Float32Array([0, Math.cos(ph)]), { disableNormalization: true });
+            const lfo = c.createOscillator(); lfo.setPeriodicWave(wave); lfo.frequency.value = 0.55;
+            const depth = c.createGain(); depth.gain.value = 0.003;
+            const delay = c.createDelay(0.1); delay.delayTime.value = 0.015;
+            lfo.connect(depth); depth.connect(delay.delayTime); lfo.start();
+            input.connect(delay);
+            const l = c.createGain(), r = c.createGain(); l.gain.value = pans[i][0]; r.gain.value = pans[i][1];
+            delay.connect(l); delay.connect(r); l.connect(merger, 0, 0); r.connect(merger, 0, 1);
+        }
+        merger.connect(wet); wet.gain.value = 0; wet.connect(output);
+        return { input, output, wet };
+    }
+
+    // ---- pitch -----------------------------------------------------------
+    freq(m) {
+        const up = this.$('btn-octave').innerText.includes("8'");
+        const cents = this.k('knob-tune', 0.5) * 200 - 100;                 // +/-100 cents
+        const wheel = parseFloat(this.$('ctrl-pitch-wheel').value);         // +/-7 semitones (a fifth)
+        return 440 * Math.pow(2, ((up ? m + 12 : m) - 69 + wheel + cents / 100) / 12);
+    }
+
+    noteOn(m) {
+        if (!this.isActive) { const s = this.$('status-mic'); s.innerText = 'PRESS POWER'; s.classList.replace('opacity-40', 'opacity-100'); return; }
+        if (this.voices.has(m)) { if (this.latch) this.noteOff(m, true); return; }
+        const ctx = this.ctx, t = ctx.currentTime, f = this.freq(m);
+        const mults = [1, 1, 0.5], types = ['sawtooth', 'square', 'square'];
+        const oscs = types.map((ty, i) => { const o = ctx.createOscillator(); o.type = ty; o.frequency.value = f * mults[i]; return o; });
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.4, t + 0.005);   // click-free
+        const acc = this.k('knob-accent');
+        oscs.forEach(o => {
+            if (acc > 0) { o.detune.setValueAtTime(-acc * 150, t); o.detune.linearRampToValueAtTime(0, t + 0.12); } // ACCENT BEND: pitch scoops up on key strike
+            this.vibGain.connect(o.detune); o.connect(g); o.start(t);
+        });
+        g.connect(this.kbdGain);
+        this.voices.set(m, { oscs, g, mults });
+        const el = document.querySelector(`[data-note="${m}"]`); if (el) el.classList.add('active-key');
+    }
+
+    noteOff(m, force = false) {
+        const v = this.voices.get(m); if (!v) return;
+        if (this.latch && !force) return;
+        const t = this.ctx.currentTime;
+        v.g.gain.cancelScheduledValues(t); v.g.gain.setTargetAtTime(0, t, 0.01);
+        v.oscs.forEach(o => o.stop(t + 0.1));
+        setTimeout(() => { v.oscs.forEach(o => { try { this.vibGain.disconnect(o.detune); } catch (e) {} }); v.g.disconnect(); }, 160);
+        this.voices.delete(m);
+        const el = document.querySelector(`[data-note="${m}"]`); if (el) el.classList.remove('active-key');
+    }
+
+    releaseAll() { [...this.voices.keys()].forEach(n => this.noteOff(n, true)); }
+
+    updatePitches() {
+        if (!this.isActive) return;
+        this.voices.forEach((v, m) => v.oscs.forEach((o, i) => this.set(o.frequency, this.freq(m) * v.mults[i])));
+    }
+
+    // ---- UI --------------------------------------------------------------
+    buildKeyboard() {
+        const kb = this.$('keyboardContainer'); kb.innerHTML = '';
+        const labels = {};
+        Object.entries(this.keyMap).forEach(([code, n]) => {
+            labels[n] = ({ Comma: ',', Period: '.', Semicolon: ';', Slash: '/' })[code] || code.replace('Key', '').replace('Digit', '');
+        });
+        const BLACK = [1, 3, 6, 8, 10];            // semitone index within octave (C=0)
+        const totalWhite = 19; let w = 0;
+        for (let i = 0; i < this.n; i++) {
+            const m = this.base + i, black = BLACK.includes(m % 12);
+            const el = document.createElement('div'); el.dataset.note = m;
+            const hint = labels[m] ? `<span class="kbd-hint"${black ? ' style="color:#666;bottom:8px"' : ''}>${labels[m]}</span>` : '';
+            if (black) { el.className = 'key-black'; el.style.left = `calc(4px + (100% - 8px) * ${w} / ${totalWhite})`; }
+            else { el.className = 'key-white'; w++; }
+            el.innerHTML = hint;
+            el.addEventListener('pointerdown', e => { e.preventDefault(); this.noteOn(m); });
+            ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); this.noteOff(m); }));
+            kb.appendChild(el);
+        }
+    }
+
+    bindControls() {
+        this.$('btn-power').addEventListener('click', () => this.init());
+
+        const latchBtn = this.$('btn-latch');
+        latchBtn.addEventListener('click', () => {
+            this.latch = !this.latch; latchBtn.classList.toggle('active-toggle', this.latch);
+            if (!this.latch) this.releaseAll();
+        });
+
+        const oct = this.$('btn-octave');
+        oct.addEventListener('click', () => {
+            const up = oct.innerText.includes("16'");
+            oct.innerText = up ? "8' UP" : "16' NRM"; oct.classList.toggle('active-toggle', up);
+            this.updatePitches();
+        });
+
+        const ens = this.$('btn-ensemble');
+        ens.addEventListener('click', () => {
+            const on = ens.innerText === 'OFF'; ens.innerText = on ? 'ON' : 'OFF'; ens.classList.toggle('active-toggle', on);
+            this.updateParams();
+        });
+
+        // Pitch wheel: continuous, centre detent (as on the VC-10)
+        const wheel = this.$('ctrl-pitch-wheel'); wheel.step = 0.05;
+        wheel.addEventListener('input', () => { if (Math.abs(wheel.value) < 0.4) wheel.value = 0; this.updatePitches(); });
+
+        document.addEventListener('keydown', e => {
+            if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+            const n = this.keyMap[e.code]; if (n) { e.preventDefault(); this.noteOn(n); }
+        });
+        document.addEventListener('keyup', e => { const n = this.keyMap[e.code]; if (n) this.noteOff(n); });
+        window.addEventListener('blur', () => { if (!this.latch) this.releaseAll(); });
+
+        // Rotary knobs
+        let knob = null, y0 = 0, v0 = 0;
+        const vis = (el, v) => { el.style.transform = `rotate(${-135 + (v / 100) * 270}deg)`; };
+        this.vis = vis;
+        document.querySelectorAll('.global-knob').forEach(el => vis(el, el.dataset.val));
+        document.addEventListener('pointerdown', async e => {
+            if (!e.target.classList.contains('global-knob')) return;
+            knob = e.target; y0 = e.clientY; v0 = parseFloat(knob.dataset.val);
+            if (knob.setPointerCapture) knob.setPointerCapture(e.pointerId);
+            await this.init();
+        });
+        document.addEventListener('pointermove', e => {
+            if (!knob) return;
+            const v = Math.max(0, Math.min(100, v0 + (y0 - e.clientY)));
+            knob.dataset.val = v; vis(knob, v); this.updateParams();
+        });
+        const end = e => { if (knob) { try { knob.releasePointerCapture(e.pointerId); } catch (_) {} knob = null; } };
+        document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+
+        document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', e => {
+            document.querySelectorAll('.preset-btn').forEach(x => x.classList.remove('active-toggle'));
+            e.target.classList.add('active-toggle');
+            this.applyPreset(e.target.dataset.preset);
+            this.$('status-ptch').innerHTML = `PTCH:<br>${e.target.innerText}`;
+        }));
+    }
+
+    updateParams(immediate = false) {
+        if (!this.isActive) return;
+        const P = (param, v) => immediate ? (param.value = v) : this.set(param, v);
+        const q = Math.PI / 2;
+        const bal = this.k('knob-in-bal');                       // KBD (0) <-> NOISE (10)
+        P(this.kbdGain.gain, Math.cos(bal * q));
+        P(this.noiseGain.gain, Math.sin(bal * q) * 0.6);
+        P(this.micGain.gain, this.k('knob-mic-lvl') * 2);
+        const out = this.k('knob-out-bal');                      // SIMULATOR (0) <-> MIC (10)
+        P(this.wetGain.gain, Math.cos(out * q));
+        P(this.dryGain.gain, Math.sin(out * q));
+        P(this.master.gain, this.$('knob-final-vol') ? this.k('knob-final-vol') : 0.8);
+        this.vibLFO.frequency.value = 1 + this.k('knob-v-speed') * 9;      // SLOW..FAST
+        P(this.vibGain.gain, this.k('knob-v-depth') * 50);                 // cents
+        P(this.ens.wet.gain, this.$('btn-ensemble').innerText === 'ON' ? 0.7 : 0);
+        this.updatePitches();
+    }
+
+    setupAnalyzer() {
+        const cv = this.$('analyzer-canvas'); if (!cv) return;
+        const g = cv.getContext('2d'), an = this.ctx.createAnalyser();
+        an.fftSize = 2048; an.minDecibels = -90; an.maxDecibels = -20; an.smoothingTimeConstant = 0.6;
+        this.bandSum.connect(an);                                // taps simulator output, independent of OUT BAL
+        const data = new Uint8Array(an.frequencyBinCount), hz = this.ctx.sampleRate / an.fftSize;
+        const F = this.freqs;
+        const edges = F.map((f, i) => [i ? Math.sqrt(F[i - 1] * f) : f / 1.17, i < F.length - 1 ? Math.sqrt(f * F[i + 1]) : f * 1.17]);
+        const draw = () => {
+            requestAnimationFrame(draw);
+            an.getByteFrequencyData(data);
+            g.fillStyle = '#041004'; g.fillRect(0, 0, cv.width, cv.height);
+            g.shadowColor = '#0f0'; g.shadowBlur = 8; g.fillStyle = '#0f0';
+            const bw = cv.width / 20 - 2;
+            edges.forEach(([lo, hi], i) => {
+                const a = Math.floor(lo / hz), b = Math.max(a + 1, Math.ceil(hi / hz));
+                let s = 0; for (let j = a; j < b; j++) s += data[j];
+                const h = (s / (b - a) / 255) * cv.height * 0.95;
+                g.fillRect(i * (bw + 2) + 2, cv.height - h, bw, h);
+            });
+            g.shadowBlur = 0;
+        };
+        draw();
+    }
+
+    applyPreset(name) {
+        const P = {
+            classic: { tune: 50, oct: "16' NRM", inBal: 20,  mic: 85, vSpd: 50, vDep: 0,  acc: 0,  ens: 'OFF', out: 0 },
+            robot:   { tune: 50, oct: "16' NRM", inBal: 0,   mic: 90, vSpd: 0,  vDep: 0,  acc: 0,  ens: 'OFF', out: 0 },
+            choir:   { tune: 50, oct: "8' UP",   inBal: 25,  mic: 85, vSpd: 65, vDep: 15, acc: 30, ens: 'ON',  out: 0 },
+            whisper: { tune: 50, oct: "16' NRM", inBal: 100, mic: 95, vSpd: 0,  vDep: 0,  acc: 0,  ens: 'ON',  out: 0 }
+        }[name];
+        if (!P) return;
+        const kn = (id, v) => { const el = this.$(id); el.dataset.val = v; this.vis(el, v); };
+        kn('knob-tune', P.tune); kn('knob-in-bal', P.inBal); kn('knob-mic-lvl', P.mic);
+        kn('knob-v-speed', P.vSpd); kn('knob-v-depth', P.vDep); kn('knob-accent', P.acc); kn('knob-out-bal', P.out);
+        const o = this.$('btn-octave'); o.innerText = P.oct; o.classList.toggle('active-toggle', P.oct.includes("8'"));
+        const e = this.$('btn-ensemble'); e.innerText = P.ens; e.classList.toggle('active-toggle', P.ens === 'ON');
+        this.updateParams();
+    }
+
+    // ---- DAW recorder ----------------------------------------------------
+    setupDAW() {
+        const btn = this.$('btnRecord'), st = this.$('recStatus'), dl = this.$('btnDownload'), R = this.rec;
+        if (typeof MediaRecorder === 'undefined') { btn.disabled = true; btn.innerText = 'N/A'; st.innerText = 'ERR'; return; }
+        btn.addEventListener('click', async () => {
+            await this.init();
+            if (!R.on) {
+                R.chunks = [];
+                const opt = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? { mimeType: 'audio/webm;codecs=opus' }
+                          : MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : undefined;
+                R.mr = new MediaRecorder(this.recordDestination.stream, opt);
+                R.mr.ondataavailable = e => { if (e.data && e.data.size) R.chunks.push(e.data); };
+                R.mr.onstop = async () => {
+                    st.innerText = 'WAIT';
+                    const raw = new Blob(R.chunks, { type: R.mr.mimeType || 'audio/webm' });
+                    try {
+                        const dec = await this.ctx.decodeAudioData(await raw.arrayBuffer());
+                        dl.href = URL.createObjectURL(this.toWav(dec)); dl.download = this.fname('wav');
+                    } catch (_) { dl.href = URL.createObjectURL(raw); dl.download = this.fname('webm'); }
+                    dl.classList.remove('opacity-40', 'pointer-events-none'); dl.style.color = '#86efac'; st.innerText = '00:00';
+                };
+                R.mr.start(); R.on = true; R.t0 = Date.now();
+                btn.classList.add('active-toggle'); btn.innerText = '■ STP';
+                dl.classList.add('opacity-40', 'pointer-events-none'); dl.style.color = '';
+                R.timer = setInterval(() => {
+                    const s = Math.floor((Date.now() - R.t0) / 1000);
+                    st.innerText = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+                }, 500);
+            } else {
+                R.mr.stop(); R.on = false; clearInterval(R.timer);
+                btn.classList.remove('active-toggle'); btn.innerText = '● REC';
+            }
+        });
+    }
+
+    toWav(buf) {
+        const ch = buf.numberOfChannels, sr = buf.sampleRate, len = buf.length;
+        const data = new Int16Array(len * ch);
+        for (let c = 0; c < ch; c++) { const x = buf.getChannelData(c); for (let i = 0; i < len; i++) { const s = Math.max(-1, Math.min(1, x[i])); data[i * ch + c] = s < 0 ? s * 0x8000 : s * 0x7FFF; } }
+        const ab = new ArrayBuffer(44 + data.length * 2), v = new DataView(ab);
+        const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+        w(0, 'RIFF'); v.setUint32(4, 36 + data.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+        v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true); v.setUint32(24, sr, true);
+        v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+        w(36, 'data'); v.setUint32(40, data.length * 2, true);
+        new Int16Array(ab, 44).set(data);
+        return new Blob([ab], { type: 'audio/wav' });
+    }
+
+    fname(ext) {
+        const d = new Date(), p = n => String(n).padStart(2, '0');
+        return `av20-recording-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}.${ext}`;
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => { window.synthInstance = new VWVocoder(); });
+
+</script>
 </body>
-</html>qqwzz
+</html>
