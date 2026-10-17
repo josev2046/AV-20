@@ -2,90 +2,96 @@
 
 **The Complete Web Audio Studio Manual**
 
-The AV-20 is a high-fidelity, 20-band analogue vocoder emulator built entirely upon the native Web Audio API. Inspired by late-1970s British and Japanese studio hardware, it bridges the gap between classic synthesis architecture and modern browser-based digital signal processing (DSP).
+The AV-20 is a 20-band vocoder emulator built entirely on the native Web Audio API. Its layout and control set are modelled on the Korg VC-10 Vocoder (Japan, late 1970s), and it adds some modern conveniences of its own (see section 7).
 
-By routing a live microphone input (the Modulator) through a 20-band envelope-following filter bank, the AV-20 superimposes the articulation of the human voice onto a dense, polyphonic synthesiser tone (the Carrier).
+A live microphone input (the Modulator) is passed through a 20-band envelope-following filter bank. The articulation of your voice is then imposed on a dense, polyphonic synthesiser tone (the Carrier).
 
 ---
 
 ## 1. Core Architecture & Signal Flow
 
-The AV-20 operates on a strict, mathematically modelled vocoder topology, enhanced with analogue-style saturation techniques to prevent digital clipping:
-
-*   **The Modulator (Microphone):** The human voice is captured, pre-emphasised (+8dB at 3kHz) to preserve high-frequency sibilance, and dynamically compressed. It is then split across 20 cascaded 24dB/octave bandpass filters for razor-sharp frequency isolation.
-*   **The Envelope Followers:** Each of the 20 bands undergoes full-wave rectification and low-pass filtering (at ~25Hz) to extract a precise amplitude contour. A +26dB envelope boost ensures the subsequent VCAs open fully.
-*   **The Carrier (Synthesiser):** A dense internal tone generator—comprising a sawtooth wave, a square wave, and a sub-octave square wave—provides the raw harmonic material.
-*   **The Synthesis (VCA Stage):** The Carrier is split into an identical 20-band filter bank. The amplitude of each synthesiser band is physically controlled by the envelope of the corresponding microphone band. The VCAs utilise a hyperbolic tangent (`Math.tanh`) wave-shaper to mimic the soft-knee saturation and natural limiting of vintage analogue circuitry.
+* **The Modulator (Microphone):** The voice is captured with browser echo cancellation, noise suppression and auto-gain disabled. It is pre-emphasised (+8 dB high shelf at 3 kHz) to preserve sibilance, compressed, then split across 20 bands. Each band uses two cascaded band-pass filters (24 dB/octave) for sharp isolation.
+* **The Envelope Followers:** Each band is full-wave rectified and low-pass filtered at about 25 Hz to extract an amplitude contour. The contour is boosted by a gain of x26 (about 28 dB).
+* **The Carrier (Synthesiser):** Each key sounds a sawtooth, a square and a sub-octave square. A full-band white noise generator is always running and is blended in with SIG BAL.
+* **The Synthesis (VCA Stage):** The carrier is split into an identical 20-band filter bank. The gain of each carrier band is controlled by the envelope of the matching microphone band. A `tanh` shaper on each envelope signal clamps it to zero or above and softly limits it, so no band gain can exceed unity.
+* **Output Chain:** Vocoder output (SIM) and dry mic (MIC) are mixed by OUT BAL, then pass through the Ensemble chorus, FINAL VOL and a master compressor.
 
 ---
 
 ## 2. Front Panel Controls
 
 ### Oscillator
-The internal polyphonic synthesiser acts as the carrier signal.
-*   **TUNE:** Adjusts the master pitch of the synthesiser by ±100 cents for fine-tuning against external instruments[cite: 6, 10, 14].
-*   **OCTAVE:** Shifts the base pitch of the keyboard between the standard 16' (Normal) register and the 8' (Up) register[cite: 6, 10, 14].
+* **TUNE:** Adjusts the pitch of the synthesiser by +/-100 cents. The centre position is A = 440 Hz.
+* **OCTAVE:** Switches the keyboard between the 16' (Normal) and 8' (Up) registers. UP raises the whole range by one octave.
 
 ### Signal Mixer
-Controls the harmonic composition of the carrier signal.
-*   **SIG BAL (KBD / NOIS):** Crossfades the carrier between the pitched polyphonic synthesiser (KBD) and a high-passed white noise generator (NOIS)[cite: 6, 10, 14]. Mixing in noise is essential for producing intelligible sibilant consonants (such as "S", "Z", "SH", and "CH")[cite: 5, 9, 13].
-*   **MIC LVL:** Sets the input gain of the microphone[cite: 6, 10, 14]. 
+* **SIG BAL (KBD / NOIS):** Equal-power crossfade of the carrier between the keyboard (KBD, fully left) and full-band white noise (NOIS, fully right). A little noise makes consonants such as "S", "Z", "SH" and "CH" more intelligible. At full NOIS, noise is the only carrier and the effect is a breathy, atonal whisper that needs no keys.
+* **MIC LVL:** Sets the gain of the microphone signal going into the vocoder and the dry path.
 
 ### Modulation
-Introduces movement and humanisation to the static synthesiser waveforms.
-*   **V. SPEED & V. DEPTH:** Controls the rate and intensity of the internal low-frequency oscillator (LFO) applied to the carrier pitch, creating a vibrato effect[cite: 6, 10, 14].
-*   **ACCENT BEND:** Introduces a transient, downward pitch-glide at the exact moment a key is struck[cite: 6, 10, 14]. This mimics the natural pitch wavering of human vocal cords for highly authentic, sung phrasing[cite: 5, 9, 13].
+* **V. SPEED / V. DEPTH:** Rate and depth of the vibrato LFO applied to the carrier pitch. Speed runs from about 1 Hz (SLW) to 10 Hz (FST). Depth runs from 0 to a maximum of +/-50 cents.
+* **ACCENT:** Adds a brief upward pitch scoop at the moment a key is struck: the note starts flat (by up to 150 cents at maximum) and glides up to pitch in about 120 ms. This imitates the pitch wavering of a human voice.
 
 ### Final Stage
-*   **ENSEMBLE:** Engages a rich, 3-phase analogue-style chorus effect[cite: 6, 10, 14]. This relies on independent, slightly offset LFOs modulating short delay lines to thicken the vocoder output.
-*   **OUT BAL (VOC / SIM):** A master crossfader balancing the fully synthesised vocoder signal (VOC) against the dry, unprocessed microphone signal (SIM, or "Simulator")[cite: 6, 10, 14].
-*   **FINAL VOL:** Attenuates the overall master output level before the final compressor stage[cite: 6, 10, 14].
+* **ENSEMBLE:** A 3-voice, 3-phase chorus (about 0.55 Hz, voices 120 degrees apart, spread across the stereo field). It is applied after OUT BAL, so it affects the mixed output, including any dry mic.
+* **OUT BAL (SIM / MIC):** Equal-power crossfade between the vocoded sound (SIM, fully left) and the dry, unprocessed microphone signal (MIC, fully right). Keep it fully left for the pure vocoder effect.
+* **FINAL VOL:** Master output level, applied before the final compressor. Fully left is silent.
 
 ---
 
 ## 3. Keyboard & Performance
 
-Due to the limitations of standard mouse inputs for polyphonic instruments, the AV-20 includes deep computer keyboard integration and sustain logic.
-
-*   **32-Key Bed:** The AV-20 features a 32-note polyphonic keyboard spanning from F2 to C5[cite: 6, 10, 14]. Holding a key opens the carrier signal at that specific pitch.
-*   **Pitch Wheel:** A tactile performance wheel located to the left of the keyboard. It bends the master pitch up or down by a perfect fifth and snaps back to the centre zero-point when released[cite: 5, 9, 13].
-*   **QWERTY Keyboard Mapping:** Play the synthesiser polyphonically using your computer keyboard.
-    *   **Lower Register (F2 to A3):** Mapped across the bottom alphanumeric row (`Z` through `/`).
-    *   **Upper Register (C4 to C5):** Mapped across the top alphanumeric row (`Q` through `I`).
-*   **LATCH:** A dedicated Chord Latch toggle. When engaged, any note clicked or typed will sustain infinitely. This allows you to build complex polyphonic chords one note at a time, freeing your hands to sweep the pitch wheel or manipulate the Signal Mixer dials. Press the Latch button again to clear all active voices.
+* **32-Key Bed:** 32 notes from F2 to C5. Holding a key sounds the carrier at that pitch. Notes are polyphonic and have a very short attack and release to avoid clicks.
+* **Pitch Wheel:** Located left of the keyboard. It bends pitch continuously by up to a perfect fifth (7 semitones) up or down. It has a centre detent for quick return to normal pitch and stays where you leave it.
+* **QWERTY Mapping:** Keys are mapped by physical position, so it works on any keyboard layout.
+    * **Lower register (F2 to A3):** the bottom row, `Z` through `/`, with the row above for sharps and flats (`S D F H J L ;`).
+    * **Upper register (C4 to C5):** the top row, `Q` through `I`, with the number keys for sharps and flats (`2 3 5 6 7`).
+    * A#3 and B3 (the two notes between the rows) are available on the on-screen keyboard only.
+* **LATCH:** When on, played notes keep sounding after release, so you can build chords one note at a time. Pressing an already-latched note switches that note off. Switching LATCH off clears all notes.
 
 ---
 
 ## 4. Patch Memory
 
-The AV-20 features a solid-state patch memory bank (arranged in a compact 2x2 grid) for instant recall of four distinct DSP states:
+Four presets set the knobs, OCTAVE and ENSEMBLE together:
 
-1.  **CLASSIC:** A balanced, classic 1970s vocoder tone with a slight noise blend for intelligibility.
-2.  **ROBOT:** Pure, rigid synthesiser tones with no vibrato or accent bend.
-3.  **CHOIR:** Shifted to the 8' Up octave with heavy vibrato, accent bend, and the Ensemble chorus engaged for a lush, synthetic vocal pad.
-4.  **WHISPER:** Disables the pitched synthesiser entirely (SIG BAL set to 100% NOIS), turning the user's voice into an eerie, atonal whisper.
+1. **CLASSIC:** Balanced vocoder tone with a slight noise blend for intelligibility.
+2. **ROBOT:** Pure keyboard carrier (no noise), no vibrato and no accent. Rigid and mechanical.
+3. **CHOIR:** 8' UP with moderate vibrato, some accent bend and ENSEMBLE on, for a lush vocal pad.
+4. **WHISPER:** SIG BAL fully on noise (keyboard silent) with ENSEMBLE on, giving an atonal, breathy whisper.
 
 ---
 
 ## 5. DAW Recorder
 
-The AV-20 features a built-in capture module that records the final, post-effects synthesised audio (it does not record the dry microphone input).
+The recorder captures the final output exactly as you hear it: after OUT BAL, Ensemble, FINAL VOL and the compressor. If OUT BAL includes dry mic, the dry mic is recorded too.
 
-*   **REC:** Arms and starts the recording. The CRT display will track the elapsed time.
-*   **STP (Stop):** Halts the recording and triggers the internal encoder.
-*   **SAVE:** Once the audio is encoded to a lossless `.wav` file, this button illuminates green, allowing you to download the pass directly to your local drive.
+* **REC:** Starts recording. Elapsed time appears in the `00:00` box next to the button.
+* **STP:** Stops recording and begins encoding. The box shows `WAIT` briefly.
+* **SAVE:** Lights green when the file is ready. The browser captures compressed audio and the AV-20 converts it to a 16-bit WAV file. If the conversion fails, the original `.webm` file is offered instead.
 
 ---
 
-## 6. Setup & Authorisation
+## 6. Setup & Operation
 
-To operate the AV-20, you must grant microphone permissions in your browser. 
-1. Click the **MIC PWR** rocker switch on the right side of the main chassis.
-2. Accept the browser security prompt allowing audio input.
-3. The CRT monitor will update to read `MIC: ACTIVE`, confirming signal flow.
-4. Use your QWERTY keyboard (or mouse) to press a key, and speak directly into your microphone to engage the vocoder.
+1. Use headphones. The dry mic and the vocoder output can feed back through speakers.
+2. Open the page over `https://` or `localhost`, because browsers block microphone access on plain local files in some cases.
+3. Click the **Power** button in the header (touching any knob or pressing REC also starts audio) and accept the microphone prompt.
+4. The CRT shows `MIC: ACTIVE` and the 20-band spectrum of the vocoder output.
+5. Set OUT BAL fully left (SIM), raise FINAL VOL, play a key and speak or sing into the microphone.
 
-*(Note: The use of headphones is strongly recommended to prevent the microphone from picking up the synthesiser output and creating an acoustic feedback loop).*
+**Performance tips:**
+* The sound takes its pitch from the keys but its tone and articulation from your voice. Play a note a split second *before* you speak or sing, because the start of each word carries the most vocal information.
+* Add a little noise (SIG BAL) if consonants are unclear.
+* If the sound is too quiet or too harsh, adjust MIC LVL and FINAL VOL.
+
+---
+
+## 7. Differences from the Korg VC-10
+
+**Additions in the AV-20:** Patch Memory, LATCH, the DAW recorder, the 20-band CRT spectrum display and the QWERTY mapping.
+
+**VC-10 features not emulated:** headphone output and level, external signal input and level, external pitch control input (for example a foot pedal), and the VU meter with its Meter Select switch.
 
 ---
 *© José Velázquez MA / Voltage & Wave*
