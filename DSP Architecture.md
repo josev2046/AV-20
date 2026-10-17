@@ -1,0 +1,105 @@
+<img width="1196" height="1498" alt="image" src="https://github.com/user-attachments/assets/9e79e655-710b-4592-b382-c6f44e9b81e4" />
+
+```
+@startuml
+skinparam componentStyle rectangle
+skinparam backgroundColor transparent
+skinparam component {
+  BackgroundColor #1e1e1e
+  FontColor #ffffff
+  BorderColor #555555
+  ArrowColor #888888
+}
+skinparam package {
+  BackgroundColor transparent
+  BorderColor #82796e
+  FontColor #cebba8
+  FontSize 14
+}
+
+title AV-20 Analogue Vocoder Emulator - DSP Architecture
+
+package "Modulator (Microphone Path)" {
+    [Microphone Input] as Mic
+    [HighShelf Pre-Emphasis\n3kHz / +8dB] as PreEmp
+    [Dynamics Compressor\nThreshold: -24dB] as MicComp
+    [Mic Input Gain] as MicGain
+}
+
+package "Carrier (Synthesiser Path)" {
+    [32-Key Keyboard] as Kbd
+    [Sawtooth Osc] as OscMain
+    [Pulse Osc] as OscPulse
+    [Sub-Octave Osc] as OscSub
+    
+    [White Noise Gen] as Noise
+    [HighPass Filter\n4kHz] as HPF
+    
+    [Synth Gain] as SynthMix
+    [Noise Gain] as NoiseMix
+    [Carrier Mix Bus] as CarrierMix
+}
+
+package "20-Band Vocoder Array (Repeated x20)" {
+    [Modulator BPF\nCascaded 24dB/oct] as ModBPF
+    [WaveShaper\nFull-Wave Rectifier] as Rectifier
+    [LowPass Filter\n25Hz Env Follower] as LPF
+    [Envelope Boost\n+26dB] as Boost
+    
+    [Carrier BPF\nCascaded 24dB/oct] as CarBPF
+    [VCA Stage] as VCA
+}
+
+package "Master Output Stage" {
+    [Dry Gain\nSimulator] as DryGain
+    [Wet Gain\nVocoder] as WetGain
+    [3-Phase Ensemble Chorus\nBucket-Brigade Emul.] as Chorus
+    [Master Compressor\nThreshold: -3dB] as MasterComp
+    
+    [Audio Destination\nSpeakers/Headphones] as Dest
+    [DAW MediaRecorder\n.wav Encoder] as Recorder
+}
+
+' Modulator Connections
+Mic --> PreEmp
+PreEmp --> MicComp
+MicComp --> MicGain
+
+' Carrier Connections
+Kbd --> OscMain
+Kbd --> OscPulse
+Kbd --> OscSub
+OscMain --> SynthMix
+OscPulse --> SynthMix
+OscSub --> SynthMix
+
+Noise --> HPF
+HPF --> NoiseMix
+
+SynthMix --> CarrierMix
+NoiseMix --> CarrierMix
+
+' Vocoder Matrix Routing
+MicGain --> ModBPF : Voice Analysis
+CarrierMix --> CarBPF : Harmonic Carrier
+
+ModBPF --> Rectifier
+Rectifier --> LPF
+LPF --> Boost
+
+CarBPF --> VCA
+Boost .right.> VCA : Amplitude\nControl Voltage
+
+' Output Routing
+MicGain --> DryGain : Unprocessed Mic
+VCA --> WetGain : Synthesised Voice
+
+WetGain --> Chorus
+DryGain --> MasterComp
+Chorus --> MasterComp
+
+MasterComp --> Dest
+MasterComp --> Recorder
+@enduml
+
+```
