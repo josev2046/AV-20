@@ -14,7 +14,7 @@ body{background:#0d0f12;color:#1a1e24;font-family:monospace;text-transform:upper
 .wooden-ear-right{border-radius:0 10px 10px 0;border-left:2px solid #111}
 .chassis{background:radial-gradient(circle at 50% 20%,#f0ebd8 0%,#e2dbc8 60%,#cebba8 100%);border-top:3px solid #f7f4e9;border-bottom:4px solid #82796e;padding:32px 36px;flex-grow:1;position:relative;display:flex;flex-direction:column;align-items:center;box-shadow:inset 0 1px 3px rgba(255,255,255,.8),inset 0 -2px 5px rgba(0,0,0,.3)}
 .rack-bolt{width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#a39c8e 0%,#3a362f 80%);border:1px solid #1a1815;box-shadow:inset 0 1px 1px rgba(255,255,255,.6),0 2px 4px rgba(0,0,0,.3);position:absolute}
-.bolt-tl{top:12px;left:12px}.bolt-tr{top:12px;right:12px}.bolt-bl{bottom:12px;left:12px}.bolt-br{bottom:12px;right:12px}
+.rack-bolt{cursor:pointer}.rack-bolt.demo-on{animation:vwspin 1s linear infinite}@keyframes vwspin{to{transform:rotate(360deg)}}.bolt-tl{top:12px;left:12px}.bolt-tr{top:12px;right:12px}.bolt-bl{bottom:12px;left:12px}.bolt-br{bottom:12px;right:12px}
 .logo-panel{background:linear-gradient(180deg,#2a2722,#171614);border:1.5px solid #000;box-shadow:inset 0 1px 1px rgba(255,255,255,.2),0 2px 4px rgba(0,0,0,.4)}
 .logo-panel-accent{background:linear-gradient(180deg,#8a2217,#4a0d07);border:1.5px solid #000;box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 0 10px rgba(200,58,42,.4)}
 .logo-panel-accent .logo-char{color:#ff9d93}.logo-panel .logo-char{color:#f0ebd8}
@@ -167,7 +167,7 @@ body{background:#0d0f12;color:#1a1e24;font-family:monospace;text-transform:upper
 class VWVocoder {
     constructor() {
         this.ctx = null; this.isActive = false; this.initPromise = null;
-        this.voices = new Map(); this.latch = false;
+        this.voices = new Map(); this.latch = false; this.demoActive = false; this.demoStop = false;
         this.base = 41;           // F2 (VC-10: 32 keys, F to C)
         this.n = 32;
         this.freqs = [80,110,150,200,270,360,480,640,850,1100,1450,1900,2500,3300,4300,5600,7300,9500,12000,15000];
@@ -209,6 +209,7 @@ class VWVocoder {
 
         this.micGain = ctx.createGain();
         this.micGain.connect(this.dryGain);
+        this.demoBus = ctx.createGain(); this.demoBus.connect(this.dryGain);   // easter-egg voice
         await this.setupMic();
 
         // Carrier: keyboard + noise generator
@@ -240,7 +241,7 @@ class VWVocoder {
             this.$('btn-power').classList.add('is-active');
             const s = this.$('status-mic'); s.innerText = 'MIC: ACTIVE'; s.classList.replace('opacity-40', 'opacity-100');
         } catch (e) {
-            alert('Microphone access is required for the vocoder modulator.');
+            if (!this.demoActive) alert('Microphone access is required for the vocoder modulator.');
         }
     }
 
@@ -259,7 +260,7 @@ class VWVocoder {
         const bp = (f) => { const b = ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = 5; return b; };
         this.freqs.forEach(f => {
             const m1 = bp(f), m2 = bp(f);
-            this.micGain.connect(m1); m1.connect(m2);
+            this.micGain.connect(m1); this.demoBus.connect(m1); m1.connect(m2);
             const rect = ctx.createWaveShaper(); rect.curve = rc;
             const env = ctx.createBiquadFilter(); env.type = 'lowpass'; env.frequency.value = 25;
             const boost = ctx.createGain(); boost.gain.value = 26;
@@ -372,6 +373,7 @@ class VWVocoder {
 
     bindControls() {
         this.$('btn-power').addEventListener('click', () => this.init());
+        document.querySelectorAll('.rack-bolt').forEach(b => b.addEventListener('click', () => this.runDemo()));
 
         const latchBtn = this.$('btn-latch');
         latchBtn.addEventListener('click', () => {
@@ -437,7 +439,7 @@ class VWVocoder {
         const bal = this.k('knob-in-bal');                       // KBD (0) <-> NOISE (10)
         P(this.kbdGain.gain, Math.cos(bal * q));
         P(this.noiseGain.gain, Math.sin(bal * q) * 0.6);
-        P(this.micGain.gain, this.k('knob-mic-lvl') * 2);
+        P(this.micGain.gain, this.demoActive ? 0 : this.k('knob-mic-lvl') * 2);
         const out = this.k('knob-out-bal');                      // SIMULATOR (0) <-> MIC (10)
         P(this.wetGain.gain, Math.cos(out * q));
         P(this.dryGain.gain, Math.sin(out * q));
@@ -487,6 +489,169 @@ class VWVocoder {
         const o = this.$('btn-octave'); o.innerText = P.oct; o.classList.toggle('active-toggle', P.oct.includes("8'"));
         const e = this.$('btn-ensemble'); e.innerText = P.ens; e.classList.toggle('active-toggle', P.ens === 'ON');
         this.updateParams();
+    }
+
+    // ---- EASTER EGG: click any chassis screw for a full demo ------------
+    // A fake "voice" (glottal saw -> formant filters + noise fricatives) replaces the mic,
+    // feeding the same 20-band modulator bank. Click a screw again to stop.
+    async sleep(ms) { for (let t = 0; t < ms && !this.demoStop; t += 50) await new Promise(r => setTimeout(r, Math.min(50, ms - t))); }
+
+    makeVoice() {
+        const c = this.ctx, out = this.demoBus;
+        const src = c.createOscillator(); src.type = 'sawtooth'; src.frequency.value = 118;
+        const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 5.5; lg.gain.value = 3;
+        lfo.connect(lg); lg.connect(src.frequency);
+        const amp = c.createGain(); amp.gain.value = 0; amp.connect(out);
+        const F = [0, 1, 2].map(i => {
+            const b = c.createBiquadFilter(), g = c.createGain();
+            b.type = 'bandpass'; b.Q.value = [8, 10, 12][i]; g.gain.value = [1, 0.7, 0.4][i];
+            src.connect(b); b.connect(g); g.connect(amp); return b;
+        });
+        const nb = c.createBuffer(1, c.sampleRate, c.sampleRate), d = nb.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        const ns = c.createBufferSource(); ns.buffer = nb; ns.loop = true;
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 6000; bp.Q.value = 0.8;
+        const fa = c.createGain(); fa.gain.value = 0;
+        ns.connect(bp); bp.connect(fa); fa.connect(out);
+        src.start(); lfo.start(); ns.start();
+        const V = { a: [800, 1200, 2500], e: [300, 2300, 3000], i: [400, 1900, 2600], o: [500, 900, 2400], u: [320, 800, 2400] };
+        return {
+            say: (v, s) => { const t = c.currentTime;
+                F.forEach((b, i) => b.frequency.setTargetAtTime(V[v][i], t, 0.03));
+                amp.gain.cancelScheduledValues(t); amp.gain.setTargetAtTime(0.5, t, 0.02); amp.gain.setTargetAtTime(0, t + s * 0.88, 0.03); },
+            hiss: s => { const t = c.currentTime; fa.gain.cancelScheduledValues(t); fa.gain.setTargetAtTime(0.5, t, 0.005); fa.gain.setTargetAtTime(0, t + s, 0.01); },
+            stop: () => { try { src.stop(); lfo.stop(); ns.stop(); } catch (e) {} amp.disconnect(); fa.disconnect(); }
+        };
+    }
+
+    async talk(v, seq) {   // vowels a e i o u, 's' = fricative, '_' = pause
+        for (const [ch, ms] of seq) {
+            if (this.demoStop) return;
+            if (ch === 's') v.hiss(ms / 1000); else if (ch !== '_') v.say(ch, ms / 1000);
+            await this.sleep(ms);
+        }
+    }
+
+    async glide(id, to, ms) {
+        const el = this.$(id), from = parseFloat(el.dataset.val), n = Math.max(1, Math.round(ms / 30));
+        for (let i = 1; i <= n && !this.demoStop; i++) {
+            const v = from + (to - from) * i / n; el.dataset.val = v; this.vis(el, v); this.updateParams(); await this.sleep(30);
+        }
+    }
+
+    async glideWheel(to, ms) {
+        const w = this.$('ctrl-pitch-wheel'), from = parseFloat(w.value), n = Math.max(1, Math.round(ms / 30));
+        for (let i = 1; i <= n && !this.demoStop; i++) { w.value = from + (to - from) * i / n; this.updatePitches(); await this.sleep(30); }
+    }
+
+    async chords(list, ms) {
+        for (const ns of list) {
+            if (this.demoStop) break;
+            ns.forEach(n => this.noteOn(n)); await this.sleep(ms); ns.forEach(n => this.noteOff(n, true));
+        }
+    }
+
+    snapshot() {
+        const s = { knobs: {} };
+        document.querySelectorAll('.global-knob').forEach(k => s.knobs[k.id] = k.dataset.val);
+        s.oct = this.$('btn-octave').innerText; s.ens = this.$('btn-ensemble').innerText;
+        s.wheel = this.$('ctrl-pitch-wheel').value; s.latch = this.latch;
+        const p = document.querySelector('.preset-btn.active-toggle'); s.preset = p ? p.dataset.preset : null;
+        s.ptch = this.$('status-ptch').innerHTML; return s;
+    }
+
+    restore(s) {
+        Object.entries(s.knobs).forEach(([id, v]) => { const el = this.$(id); el.dataset.val = v; this.vis(el, v); });
+        const o = this.$('btn-octave'); o.innerText = s.oct; o.classList.toggle('active-toggle', s.oct.includes("8'"));
+        const e = this.$('btn-ensemble'); e.innerText = s.ens; e.classList.toggle('active-toggle', s.ens === 'ON');
+        this.$('ctrl-pitch-wheel').value = s.wheel;
+        this.latch = s.latch; this.$('btn-latch').classList.toggle('active-toggle', s.latch);
+        this.setPresetButton(s.preset); this.$('status-ptch').innerHTML = s.ptch; this.updateParams();
+    }
+
+    setPresetButton(name) {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active-toggle', b.dataset.preset === name));
+    }
+
+    async runDemo() {
+        if (this.demoActive) { this.demoStop = true; return; }
+        this.demoActive = true; this.demoStop = false;
+        const bolts = document.querySelectorAll('.rack-bolt'); bolts.forEach(b => b.classList.add('demo-on'));
+        let saved = null, v = null;
+        try {
+            await this.init();                       // mic is muted during the demo; a denied prompt is fine
+            if (this.ctx.state === 'suspended') await this.ctx.resume();
+            saved = this.snapshot();
+            this.releaseAll(); this.latch = false; this.$('btn-latch').classList.remove('active-toggle');
+            this.updateParams();
+            v = this.makeVoice();
+            await this.demoScript(v);
+        } catch (err) { console.error(err); }
+        finally {
+            if (v) v.stop();
+            this.releaseAll(); this.demoActive = false; this.demoStop = false;
+            bolts.forEach(b => b.classList.remove('demo-on'));
+            if (saved) this.restore(saved);
+        }
+    }
+
+    async demoScript(v) {
+        const cap = t => { this.$('status-ptch').innerHTML = 'DEMO:<br>' + t; };
+        const preset = n => { this.setPresetButton(n); this.applyPreset(n); };
+        const rep = (s, n) => [].concat(...Array.from({ length: n }, () => s));
+        const alive = () => !this.demoStop;
+
+        // 1. ROBOT: rigid carrier, pure vocal articulation
+        preset('robot'); cap('ROBOT');
+        await Promise.all([
+            this.talk(v, rep([['a', 350], ['_', 50], ['o', 350], ['_', 50], ['e', 350], ['_', 50], ['u', 500], ['_', 100]], 4)),
+            this.chords([[41, 45, 48], [46, 50, 53], [48, 52, 55], [41, 45, 48]], 1800)
+        ]);
+        if (!alive()) return;
+
+        // 2. CLASSIC: a little noise makes consonants intelligible
+        preset('classic'); cap('CLASSIC + NOISE');
+        await Promise.all([
+            this.talk(v, rep([['s', 140], ['i', 260], ['s', 100], ['_', 40], ['a', 300], ['s', 140], ['o', 300], ['_', 100]], 4)),
+            this.chords([[43, 47, 50], [45, 48, 52], [46, 50, 53], [48, 52, 55]], 1400)
+        ]);
+        if (!alive()) return;
+
+        // 3. Expression: vibrato, accent bend, pitch wheel
+        cap('VIBRATO + ACCENT + WHEEL');
+        await Promise.all([
+            (async () => { await this.glide('knob-v-speed', 60, 400); await this.glide('knob-v-depth', 35, 400); await this.glide('knob-accent', 70, 400); })(),
+            this.chords([[41, 48, 52, 57]], 4200),
+            this.talk(v, [['a', 1500], ['o', 1500], ['e', 1000], ['_', 200]]),
+            (async () => { await this.sleep(1200); await this.glideWheel(4, 1400); await this.glideWheel(-4, 1400); await this.glideWheel(0, 600); })()
+        ]);
+        if (!alive()) return;
+
+        // 4. CHOIR: 8' up, ensemble chorus
+        preset('choir'); cap('CHOIR + ENSEMBLE');
+        await Promise.all([
+            this.talk(v, [['a', 2100], ['_', 100], ['o', 2100], ['_', 100], ['i', 2100], ['_', 100], ['e', 1200], ['o', 1500]]),
+            this.chords([[53, 57, 60, 64], [50, 53, 57, 62], [46, 50, 53, 58], [48, 52, 55, 60]], 2300)
+        ]);
+        if (!alive()) return;
+
+        // 5. WHISPER: noise-only carrier, no keys needed
+        preset('whisper'); cap('WHISPER (NOISE)');
+        await this.talk(v, rep([['s', 200], ['a', 400], ['s', 150], ['e', 400], ['_', 100], ['o', 500], ['s', 300], ['u', 500], ['_', 200]], 2));
+        if (!alive()) return;
+
+        // 6. OUT BAL sweep: SIM (vocoder) -> MIC (dry voice) -> back
+        preset('classic'); cap('OUT BAL: SIM > MIC');
+        await Promise.all([
+            this.talk(v, rep([['a', 350], ['_', 50], ['o', 350], ['_', 50], ['e', 350], ['_', 50], ['u', 500], ['_', 100]], 4)),
+            this.chords([[41, 45, 48]], 7000),
+            (async () => { await this.glide('knob-out-bal', 100, 3200); await this.glide('knob-out-bal', 0, 3200); })()
+        ]);
+        if (!alive()) return;
+
+        // 7. Finale
+        preset('choir'); cap('THANK YOU');
+        await Promise.all([this.talk(v, [['o', 2600]]), this.chords([[53, 57, 60, 65]], 2800)]);
     }
 
     // ---- DAW recorder ----------------------------------------------------
