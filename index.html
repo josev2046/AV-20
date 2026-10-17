@@ -155,7 +155,7 @@ body{background:#0d0f12;color:#1a1e24;font-family:monospace;text-transform:upper
 </div>
 
 <div class="flex justify-between items-center w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
- <div class="text-[9px] text-[#82796e] font-mono tracking-widest">QWERTY: Z-/ (LOWER) / Q-I (UPPER) · USE HEADPHONES</div>
+ <div class="text-[9px] text-[#82796e] font-mono tracking-widest">QWERTY: Z-⇧ (LOWER) / Q-I (UPPER) · USE HEADPHONES</div>
  <div class="text-[10px] text-[#38342e] font-mono font-bold tracking-widest">&copy; JOSE VELAZQUEZ MA / <a href="https://voltageandwave.co.uk/" target="_blank" rel="noopener noreferrer" class="hover:text-[#c83a2a] underline transition-colors">VOLTAGE &amp; WAVE</a></div>
 </div>
 
@@ -174,7 +174,7 @@ class VWVocoder {
         // Layout-independent mapping (event.code). Z-row = F2..A3, Q-row = C4..C5
         this.keyMap = {
             KeyZ:41,KeyS:42,KeyX:43,KeyD:44,KeyC:45,KeyF:46,KeyV:47,KeyB:48,KeyH:49,KeyN:50,KeyJ:51,KeyM:52,
-            Comma:53,KeyL:54,Period:55,Semicolon:56,Slash:57,
+            Comma:53,KeyL:54,Period:55,Semicolon:56,Slash:57,Quote:58,ShiftRight:59,
             KeyQ:60,Digit2:61,KeyW:62,Digit3:63,KeyE:64,KeyR:65,Digit5:66,KeyT:67,Digit6:68,KeyY:69,Digit7:70,KeyU:71,KeyI:72
         };
         this.rec = { mr: null, chunks: [], on: false, t0: 0, timer: null };
@@ -354,7 +354,7 @@ class VWVocoder {
         const kb = this.$('keyboardContainer'); kb.innerHTML = '';
         const labels = {};
         Object.entries(this.keyMap).forEach(([code, n]) => {
-            labels[n] = ({ Comma: ',', Period: '.', Semicolon: ';', Slash: '/' })[code] || code.replace('Key', '').replace('Digit', '');
+            labels[n] = ({ Comma: ',', Period: '.', Semicolon: ';', Slash: '/', Quote: "'", ShiftRight: '\u21E7' })[code] || code.replace('Key', '').replace('Digit', '');
         });
         const BLACK = [1, 3, 6, 8, 10];            // semitone index within octave (C=0)
         const totalWhite = 19; let w = 0;
@@ -514,20 +514,40 @@ class VWVocoder {
         const fa = c.createGain(); fa.gain.value = 0;
         ns.connect(bp); bp.connect(fa); fa.connect(out);
         src.start(); lfo.start(); ns.start();
-        const V = { a: [800, 1200, 2500], e: [300, 2300, 3000], i: [400, 1900, 2600], o: [500, 900, 2400], u: [320, 800, 2400] };
+        // vowels: formants F1-F3
+        const V = { a: [800, 1200, 2500], ae: [700, 1600, 2500], e: [550, 1800, 2500], i: [300, 2300, 3000], ih: [400, 1900, 2600],
+                    o: [500, 900, 2400], u: [320, 800, 2400], uh: [650, 1100, 2400], er: [500, 1350, 1700] };
+        // voiced consonants: [formants, voicing amp, hiss freq, hiss amp]
+        const C = { v: [[250, 1100, 2300], 0.3, 3500, 0.25], l: [[360, 1100, 2500], 0.45], n: [[250, 1100, 2400], 0.3],
+                    m: [[250, 1000, 2200], 0.3], w: [[300, 700, 2300], 0.45] };
+        // noise consonants: [hiss freq, hiss amp, plosive?, voicing amp]
+        const U = { s: [6500, 0.6, false, 0], t: [4500, 0.55, true, 0], k: [2200, 0.55, true, 0], p: [1200, 0.5, true, 0],
+                    d: [3500, 0.45, true, 0.15], b: [1500, 0.45, true, 0.15], g: [2000, 0.45, true, 0.15], j: [5000, 0.5, false, 0.25] };
         return {
-            say: (v, s) => { const t = c.currentTime;
-                F.forEach((b, i) => b.frequency.setTargetAtTime(V[v][i], t, 0.03));
-                amp.gain.cancelScheduledValues(t); amp.gain.setTargetAtTime(0.5, t, 0.02); amp.gain.setTargetAtTime(0, t + s * 0.88, 0.03); },
-            hiss: s => { const t = c.currentTime; fa.gain.cancelScheduledValues(t); fa.gain.setTargetAtTime(0.5, t, 0.005); fa.gain.setTargetAtTime(0, t + s, 0.01); },
+            ph: (k, ms) => {
+                const s = ms / 1000, t = c.currentTime, set = f => F.forEach((b, i) => b.frequency.setTargetAtTime(f[i], t, 0.015));
+                amp.gain.cancelScheduledValues(t); fa.gain.cancelScheduledValues(t);
+                if (V[k]) { set(V[k]); amp.gain.setTargetAtTime(0.5, t, 0.02); amp.gain.setTargetAtTime(0, t + s * 0.92, 0.015); }
+                else if (C[k]) {
+                    const [f, a, hf, ha] = C[k]; set(f);
+                    amp.gain.setTargetAtTime(a, t, 0.02); amp.gain.setTargetAtTime(0, t + s * 0.92, 0.015);
+                    if (ha) { bp.frequency.setValueAtTime(hf, t); fa.gain.setTargetAtTime(ha, t, 0.01); fa.gain.setTargetAtTime(0, t + s * 0.92, 0.015); }
+                } else if (U[k]) {
+                    const [hf, ha, plo, va] = U[k], b0 = plo ? s * 0.6 : 0;   // plosives: silent closure, then burst
+                    bp.frequency.setValueAtTime(hf, t); set([500, 1400, 2400]);
+                    if (va) { amp.gain.setTargetAtTime(va, t, 0.01); amp.gain.setTargetAtTime(0, t + (plo ? b0 : s * 0.9), 0.01); } else amp.gain.setTargetAtTime(0, t, 0.005);
+                    fa.gain.setTargetAtTime(ha, t + b0, 0.004); fa.gain.setTargetAtTime(0, t + s * 0.95, 0.01);
+                }
+            },
             stop: () => { try { src.stop(); lfo.stop(); ns.stop(); } catch (e) {} amp.disconnect(); fa.disconnect(); }
         };
     }
 
-    async talk(v, seq) {   // vowels a e i o u, 's' = fricative, '_' = pause
-        for (const [ch, ms] of seq) {
+    async talk(v, str, reps = 1) {   // "ph:ms ph:ms ..." ; '_' = pause
+        const seq = str.trim().split(/\s+/).map(t => { const [k, ms] = t.split(':'); return [k, +ms]; });
+        for (let r = 0; r < reps; r++) for (const [k, ms] of seq) {
             if (this.demoStop) return;
-            if (ch === 's') v.hiss(ms / 1000); else if (ch !== '_') v.say(ch, ms / 1000);
+            if (k !== '_') v.ph(k, ms);
             await this.sleep(ms);
         }
     }
@@ -598,60 +618,43 @@ class VWVocoder {
     async demoScript(v) {
         const cap = t => { this.$('status-ptch').innerHTML = 'DEMO:<br>' + t; };
         const preset = n => { this.setPresetButton(n); this.applyPreset(n); };
-        const rep = (s, n) => [].concat(...Array.from({ length: n }, () => s));
         const alive = () => !this.demoStop;
+        const WAVE = 'v:90 o:220 l:90 t:80 ih:140 j:120 _:60 ae:150 n:80 d:70 _:60 w:80 e:150 ih:120 v:100 _:300';   // "Voltage and Wave"
+        const BAND = 't:70 w:70 e:130 n:80 t:60 i:200 _:60 b:70 ae:180 n:90 d:70 _:60 v:80 o:160 k:80 o:140 d:70 er:200 _:250'; // "Twenty band vocoder"
 
-        // 1. ROBOT: rigid carrier, pure vocal articulation
         preset('robot'); cap('ROBOT');
-        await Promise.all([
-            this.talk(v, rep([['a', 350], ['_', 50], ['o', 350], ['_', 50], ['e', 350], ['_', 50], ['u', 500], ['_', 100]], 4)),
-            this.chords([[41, 45, 48], [46, 50, 53], [48, 52, 55], [41, 45, 48]], 1800)
-        ]);
+        await Promise.all([this.talk(v, WAVE, 4), this.chords([[41, 45, 48], [46, 50, 53], [48, 52, 55], [41, 45, 48]], 1910)]);
         if (!alive()) return;
 
-        // 2. CLASSIC: a little noise makes consonants intelligible
         preset('classic'); cap('CLASSIC + NOISE');
-        await Promise.all([
-            this.talk(v, rep([['s', 140], ['i', 260], ['s', 100], ['_', 40], ['a', 300], ['s', 140], ['o', 300], ['_', 100]], 4)),
-            this.chords([[43, 47, 50], [45, 48, 52], [46, 50, 53], [48, 52, 55]], 1400)
-        ]);
+        await Promise.all([this.talk(v, BAND, 3), this.chords([[43, 47, 50], [45, 48, 52], [46, 50, 53]], 2200)]);
         if (!alive()) return;
 
-        // 3. Expression: vibrato, accent bend, pitch wheel
         cap('VIBRATO + ACCENT + WHEEL');
         await Promise.all([
             (async () => { await this.glide('knob-v-speed', 60, 400); await this.glide('knob-v-depth', 35, 400); await this.glide('knob-accent', 70, 400); })(),
-            this.chords([[41, 48, 52, 57]], 4200),
-            this.talk(v, [['a', 1500], ['o', 1500], ['e', 1000], ['_', 200]]),
+            this.chords([[41, 48, 52, 57]], 4400),
+            this.talk(v, 'l:100 a:1400 l:80 o:1400 l:80 e:1100 _:200'),
             (async () => { await this.sleep(1200); await this.glideWheel(4, 1400); await this.glideWheel(-4, 1400); await this.glideWheel(0, 600); })()
         ]);
         if (!alive()) return;
 
-        // 4. CHOIR: 8' up, ensemble chorus
         preset('choir'); cap('CHOIR + ENSEMBLE');
-        await Promise.all([
-            this.talk(v, [['a', 2100], ['_', 100], ['o', 2100], ['_', 100], ['i', 2100], ['_', 100], ['e', 1200], ['o', 1500]]),
-            this.chords([[53, 57, 60, 64], [50, 53, 57, 62], [46, 50, 53, 58], [48, 52, 55, 60]], 2300)
-        ]);
+        await Promise.all([this.talk(v, 'm:200 a:1900 o:2000 i:2000 e:1300 o:1500'),
+            this.chords([[53, 57, 60, 64], [50, 53, 57, 62], [46, 50, 53, 58], [48, 52, 55, 60]], 2300)]);
         if (!alive()) return;
 
-        // 5. WHISPER: noise-only carrier, no keys needed
         preset('whisper'); cap('WHISPER (NOISE)');
-        await this.talk(v, rep([['s', 200], ['a', 400], ['s', 150], ['e', 400], ['_', 100], ['o', 500], ['s', 300], ['u', 500], ['_', 200]], 2));
+        await this.talk(v, 'w:80 ih:130 s:150 p:80 er:220 _:200 t:70 w:70 e:130 n:80 t:60 i:200 _:200 v:80 o:160 k:80 o:140 d:70 er:200 _:400', 2);
         if (!alive()) return;
 
-        // 6. OUT BAL sweep: SIM (vocoder) -> MIC (dry voice) -> back
         preset('classic'); cap('OUT BAL: SIM > MIC');
-        await Promise.all([
-            this.talk(v, rep([['a', 350], ['_', 50], ['o', 350], ['_', 50], ['e', 350], ['_', 50], ['u', 500], ['_', 100]], 4)),
-            this.chords([[41, 45, 48]], 7000),
-            (async () => { await this.glide('knob-out-bal', 100, 3200); await this.glide('knob-out-bal', 0, 3200); })()
-        ]);
+        await Promise.all([this.talk(v, WAVE, 3), this.chords([[41, 45, 48]], 5800),
+            (async () => { await this.glide('knob-out-bal', 100, 2800); await this.glide('knob-out-bal', 0, 2800); })()]);
         if (!alive()) return;
 
-        // 7. Finale
-        preset('choir'); cap('THANK YOU');
-        await Promise.all([this.talk(v, [['o', 2600]]), this.chords([[53, 57, 60, 65]], 2800)]);
+        preset('choir'); cap('VOLTAGE & WAVE');
+        await Promise.all([this.talk(v, 'w:100 o:2500'), this.chords([[53, 57, 60, 65]], 2800)]);
     }
 
     // ---- DAW recorder ----------------------------------------------------
