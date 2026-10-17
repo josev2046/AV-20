@@ -1,6 +1,9 @@
 # AV-20
 vocoder [work in progress]
 
+<img width="1196" height="1498" alt="image" src="https://github.com/user-attachments/assets/8a126b05-a7c6-498a-8560-1cf63abc4538" />
+
+
 --
 
 # Voltage & Wave AV-20 // Analogue Vocoder Emulator
