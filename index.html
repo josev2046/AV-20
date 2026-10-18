@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voltage & Wave — AV-20 Analogue Vocoder Emulator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="synth-enclosure">
+<div class="wooden-ear wooden-ear-left"></div>
+<div class="chassis">
+<div class="rack-bolt bolt-tl"></div><div class="rack-bolt bolt-tr"></div><div class="rack-bolt bolt-bl"></div><div class="rack-bolt bolt-br"></div>
+
+<!-- HEADER -->
+<div class="flex items-center justify-between w-full mb-8 pb-5 border-b-2 border-[#38342e]/40">
+ <div class="flex flex-col gap-2 flex-shrink-0">
+  <div class="flex items-center gap-1.5 select-none">
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">V</span></div>
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">&amp;</span></div>
+   <div class="logo-panel-accent w-11 h-11 rounded flex items-center justify-center mr-3"><span class="logo-char font-mono font-black text-xl">W</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">A</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">V</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">-</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">2</span></div>
+   <div class="logo-panel w-11 h-11 rounded flex items-center justify-center"><span class="logo-char font-mono font-black text-xl">0</span></div>
+  </div>
+  <div class="flex items-center justify-between w-full text-[9px] font-mono font-bold tracking-widest text-[#38342e] border-t border-[#38342e]/30 pt-1.5 mt-1">
+   <span>20-BAND VOCODER</span><span class="text-[#c83a2a]">•</span><span>ANALOG EMULATOR</span>
+  </div>
+ </div>
+
+ <div class="crt-screen w-[260px] h-[72px] flex items-center justify-between px-3 py-2 flex-shrink-0 mx-6">
+  <canvas id="analyzer-canvas" width="170" height="50" class="z-10 h-full"></canvas>
+  <div class="text-[#0f0] font-mono text-[9px] text-right leading-tight z-10 flex flex-col justify-center h-full pl-2 border-l border-[#0f0]/30 ml-2 gap-1.5 flex-1">
+   <div id="status-mic" class="opacity-40 whitespace-nowrap">MIC: OFF</div>
+   <div id="status-ptch" class="text-[#ffaa00] whitespace-nowrap">PTCH:<br>CLASSIC</div>
+  </div>
+ </div>
+
+ <div class="flex items-end justify-between gap-6 flex-shrink-0">
+  <div class="flex flex-col gap-2 items-center flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">DAW Recorder</span>
+   <div class="flex gap-2 items-center">
+    <button id="btnRecord" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold whitespace-nowrap">● REC</button>
+    <div id="recStatus" class="font-mono font-bold text-[#1f1a14] bg-[#e2dbc8] text-[10px] w-12 text-center py-1.5 rounded border border-[#38342e]/30">00:00</div>
+    <a id="btnDownload" href="#" class="tactile-button px-3 py-1.5 rounded text-[10px] font-bold text-center opacity-40 pointer-events-none whitespace-nowrap">SAVE</a>
+   </div>
+  </div>
+  <div class="flex flex-col gap-2 items-center flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">Patch Memory</span>
+   <div class="grid grid-cols-2 gap-1.5 w-[140px]">
+    <button class="tactile-button active-toggle text-[9px] py-1 rounded-sm preset-btn" data-preset="classic">CLASSIC</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="robot">ROBOT</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="choir">CHOIR</button>
+    <button class="tactile-button text-[9px] py-1 rounded-sm preset-btn" data-preset="whisper">WHISPER</button>
+   </div>
+  </div>
+  <div class="flex flex-col items-center gap-2 flex-shrink-0">
+   <span class="text-[9px] font-bold tracking-widest text-[#82796e]">Power</span>
+   <button id="btn-power" class="rocker-button text-white w-12 h-10 font-black rounded-sm flex items-center justify-center">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>
+   </button>
+  </div>
+ </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="panel-outline w-full px-6 py-8 mb-8 flex justify-between items-center overflow-x-auto">
+<div class="flex flex-nowrap items-center justify-between min-w-max gap-5 mx-auto w-full">
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#ece6d5] px-2">OSCILLATOR</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">-100</span><span class="tick-label label-top">0</span><span class="tick-label label-right">+100</span><div class="knob global-knob" id="knob-tune" data-val="50"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">TUNE</span></div>
+  <div class="flex flex-col items-center justify-center h-full mt-2"><button id="btn-octave" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm active-toggle whitespace-nowrap">16' NRM</button><span class="text-[10px] font-bold text-[#1f1a14] mt-2">OCTAVE</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e9e1cd] px-2">SIGNAL MIXER</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">KBD</span><span class="tick-label label-right">NOIS</span><div class="knob global-knob" id="knob-in-bal" data-val="20"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">SIG BAL</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">MIN</span><span class="tick-label label-right">MAX</span><div class="knob global-knob" id="knob-mic-lvl" data-val="85"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">MIC LVL</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e5dbc4] px-2">MODULATION</span>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">SLW</span><span class="tick-label label-right">FST</span><div class="knob global-knob" id="knob-v-speed" data-val="50"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. SPEED</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">0</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-v-depth" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">V. DEPTH</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">0</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-accent" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">ACCENT</span></div>
+ </div>
+ <div class="panel-divider"></div>
+
+ <div class="flex items-center gap-6 relative">
+  <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-widest text-[#82796e] whitespace-nowrap bg-[#e2d8bd] px-2">FINAL STAGE</span>
+  <div class="flex flex-col items-center justify-center h-full mt-2"><button id="btn-ensemble" class="tactile-button text-[10px] font-bold w-14 py-2.5 rounded-sm whitespace-nowrap">OFF</button><span class="text-[10px] font-bold text-[#1f1a14] mt-2">ENSEMBLE</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">SIM</span><span class="tick-label label-right">MIC</span><div class="knob global-knob" id="knob-out-bal" data-val="0"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">OUT BAL</span></div>
+  <div class="knob-wrapper mt-2"><div class="tick-container"><div class="tick-ring"></div><span class="tick-label label-left">OFF</span><span class="tick-label label-right">10</span><div class="knob global-knob" id="knob-final-vol" data-val="80"></div></div><span class="text-[10px] font-bold text-[#1f1a14] mt-1">FINAL VOL</span></div>
+ </div>
+
+</div>
+</div>
+
+<!-- KEYBOARD -->
+<div class="w-full flex gap-6 items-end">
+ <div class="flex flex-col items-center gap-2 mb-1 flex-shrink-0">
+  <button id="btn-latch" class="tactile-button text-[9px] font-bold w-full py-1.5 rounded-sm mb-1" title="Hold notes indefinitely">LATCH</button>
+  <div class="pitch-wheel-wrapper"><input type="range" id="ctrl-pitch-wheel" min="-7" max="7" step="0.05" value="0" class="pitch-wheel"></div>
+  <span class="text-[10px] font-bold text-[#1f1a14]">PITCH</span>
+ </div>
+ <div class="keyboard-bed flex-1" id="keyboardContainer"></div>
+</div>
+
+<div class="flex justify-between items-center w-full pt-4 mt-6 border-t-2 border-[#38342e]/30">
+ <div class="text-[9px] text-[#82796e] font-mono tracking-widest">QWERTY: Z-⇧ (LOWER) / Q-I (UPPER) · USE HEADPHONES</div>
+ <div class="text-[10px] text-[#38342e] font-mono font-bold tracking-widest">&copy; JOSE VELAZQUEZ MA / <a href="https://voltageandwave.co.uk/" target="_blank" rel="noopener noreferrer" class="hover:text-[#c83a2a] underline transition-colors">VOLTAGE &amp; WAVE</a></div>
+</div>
+
+</div>
+<div class="wooden-ear wooden-ear-right"></div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
