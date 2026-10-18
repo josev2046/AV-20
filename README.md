@@ -23,7 +23,7 @@ js/
   ui.js           panel: keyboard, knobs, presets, spectrum display
   recorder.js     DAW recorder (WAV export)
   demo.js         easter egg: click a chassis screw
-docs/             manual
+
 ```
 ---
 
