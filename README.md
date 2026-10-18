@@ -6,6 +6,28 @@ A live microphone input (the Modulator) is passed through a 20-band envelope-fol
 
 ---
 
+# AV-20 · Analogue Vocoder Emulator
+
+A 20-band vocoder built on the Web Audio API, modelled on the Korg VC-10.
+Live demo: https://josev2046.github.io/AV-20/
+
+## Structure
+
+```
+index.html        page markup
+css/styles.css    all styling
+js/
+  main.js         entry point; composes the modules below
+  config.js       band frequencies, QWERTY map, patch presets
+  engine.js       audio engine: signal flow, 20-band vocoder, carrier, pitch
+  ui.js           panel: keyboard, knobs, presets, spectrum display
+  recorder.js     DAW recorder (WAV export)
+  demo.js         easter egg: click a chassis screw
+docs/             manual
+```
+---
+
+
 ## 1. Core Architecture & Signal Flow
 
 * **The Modulator (Microphone):** The voice is captured with browser echo cancellation, noise suppression and auto-gain disabled. It is pre-emphasised (+8 dB high shelf at 3 kHz) to preserve sibilance, compressed, then split across 20 bands. Each band uses two cascaded band-pass filters (24 dB/octave) for sharp isolation.
