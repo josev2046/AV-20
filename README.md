@@ -1,5 +1,8 @@
 # Voltage & Wave AV-20 // Analogue Vocoder Emulator
 
+[![DOI](https://zenodo.org/badge/1423723223.svg)](https://doi.org/10.5281/zenodo.23468533)
+
+
 The AV-20 is a 20-band vocoder emulator built entirely on the native Web Audio API. Its layout and control set are modelled on the Korg VC-10 Vocoder (Japan, late 1970s), and it adds some modern conveniences of its own (see section 7).
 
 A live microphone input (the Modulator) is passed through a 20-band envelope-following filter bank. The articulation of your voice is then imposed on a dense, polyphonic synthesiser tone (the Carrier).
